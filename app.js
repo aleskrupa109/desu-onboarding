@@ -1227,7 +1227,7 @@ function renderList(){
             <tr class="index-row" data-open="${r.id}">
               ${canCreate ? `<td><input type="checkbox" data-export-select="${r.id}" ${state.selectedExport[r.id]?'checked':''} ${isReviewed?'':'disabled'}></td>` : ''}
               ${isAdmin ? `<td><input type="checkbox" data-assign-select="${r.id}" ${state.selectedAssign[r.id]?'checked':''}></td>` : ''}
-              <td><div class="index-name">${esc(r.jmeno)} ${esc(r.prijmeni)}</div><div class="index-ref">${esc(r.ref)}</div></td>
+              <td><div class="index-name">${esc(r.jmeno)} ${esc(r.prijmeni)} ${canCreate ? `<button class="btn-quickedit-icon" data-quickedit="${r.id}" title="Rychle doplnit základní údaje">✎</button>` : ''}</div><div class="index-ref">${esc(r.ref)}</div></td>
               <td>${esc(r.pozice || '—')}</td>
               <td>${esc(r.pracoviste || '—')}</td>
               <td>${esc(formatDate(r.datumNastupu)) || '—'}</td>
@@ -1235,7 +1235,7 @@ function renderList(){
               <td>${chip(r.itDone === r.itTotal && r.itTotal>0, `${r.itDone||0}/${r.itTotal||0}`)}</td>
               ${state.role==='admin'?`<td>${urgencyChip(r)}</td><td>${adminList().length ? `<select data-list-assign="${r.id}"><option value="">— nepřiřazeno —</option>${adminList().map(a => `<option value="${esc(a)}" ${r.assignedAdmin===a?'selected':''}>${esc(a)}</option>`).join('')}</select>` : (r.assignedAdmin ? esc(r.assignedAdmin) : '<span style="color:var(--ink-faint);">—</span>')}</td>`:''}
               ${canCreate?`<td>${r.vemaExportedAt ? `<span class="chip chip-done" title="${esc(new Date(r.vemaExportedAt).toLocaleString('cs-CZ'))}">Vygenerováno</span>` : `<span class="chip chip-progress-bg">Negenerováno</span>`}</td>
-              <td style="text-align:right;white-space:nowrap;"><button class="btn-delete-tiny" data-quickedit="${r.id}" title="Rychle doplnit základní údaje">✎</button> <button class="btn-delete-tiny" data-delete="${r.id}" title="Smazat spis">Smazat</button></td>`:''}
+              <td style="text-align:right;"><button class="btn-delete-tiny" data-delete="${r.id}" title="Smazat spis">Smazat</button></td>`:''}
             </tr>
           `;
           }).join('')}
@@ -2176,6 +2176,23 @@ function renderImportMappingPage(){
     </div>
     <h2 style="font-family:var(--font-display);font-size:1.4rem;margin:0 0 6px;">Vytěžení podkladů — ${esc(cur.fileName)}</h2>
     <p style="font-size:13px;color:var(--ink-soft);margin:0 0 16px;">Nalezeno ${cur.rows.length} řádků. Zkontrolujte prosím u každého sloupce, na jaký údaj se má namapovat — appka to zkusila odhadnout sama, ale stojí za to to zkontrolovat, hlavně u sloupců, které nešly jednoznačně rozpoznat.</p>
+
+    <div class="panel" style="margin-bottom:16px;">
+      <h4 style="font-family:var(--font-display);font-size:1.125rem;margin:0 0 4px;">Společné hodnoty pro celý soubor</h4>
+      <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 12px;">Nepovinné. Tabulky bývají za jednotlivá pracoviště, takže třeba pracoviště nebo datum nástupu bude stejné pro všechny řádky — vyplňte to tady místo v tabulce sloupec po sloupci. Pokud níže zároveň namapujete i sloupec z tabulky pro stejný údaj, hodnota ze sloupce má přednost.</p>
+      <div class="form-grid">
+        ${IMPORT_COMMON_FIELDS.map(f => `
+          <div class="field">
+            <label>${esc(f.label)}</label>
+            ${f.type === 'select'
+              ? `<select data-import-common="${f.key}">${f.options().map(o => `<option value="${esc(o)}" ${(cur.common[f.key]||'')===o?'selected':''}>${esc(o || '— nevyplněno —')}</option>`).join('')}</select>`
+              : `<input type="date" data-import-common="${f.key}" value="${esc(cur.common[f.key]||'')}">`
+            }
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
     <div class="panel" style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead><tr>
@@ -2665,7 +2682,7 @@ function attachHandlers(){
         }
         const mapping = {};
         headers.forEach((h,i) => { mapping[i] = guessFieldTarget(h); });
-        queue.push({ fileName: file.name, headers, rows, mapping });
+        queue.push({ fileName: file.name, headers, rows, mapping, common:{} });
       }catch(err){
         console.error('readXlsxFile failed:', err);
         state.error = `Nepodařilo se přečíst soubor „${file.name}": ${err.message}`;
@@ -2679,6 +2696,11 @@ function attachHandlers(){
     render();
   });
 
+  app.querySelectorAll('[data-import-common]').forEach(el => {
+    el.addEventListener('change', () => {
+      state.importCurrent.common[el.getAttribute('data-import-common')] = el.value;
+    });
+  });
   app.querySelectorAll('[data-import-map]').forEach(sel => {
     sel.addEventListener('change', () => {
       state.importCurrent.mapping[sel.getAttribute('data-import-map')] = sel.value;
@@ -3444,6 +3466,16 @@ function openReturnModal(){
   });
 }
 
+const IMPORT_COMMON_FIELDS = [
+  { key:'pracoviste', label:'Pracoviště', type:'select', options: () => ['', ...workplaceList()] },
+  { key:'datum_nastupu', label:'Datum nástupu', type:'date' },
+  { key:'typ_nastupu', label:'Typ nástupu', type:'select', options: () => ['', ...ONBOARDING_TYPES] },
+  { key:'kategorie', label:'Kategorie', type:'select', options: () => ['', ...categoryNames()] },
+  { key:'odbor_oddeleni', label:'Odbor / oddělení', type:'select', options: () => ['', ...departmentList()] },
+  { key:'rezim_zamestnani', label:'Typ úvazku', type:'select', options: () => ['','Pracovní poměr','Služební poměr'] },
+  { key:'doba_trvani_pomeru', label:'Doba trvání poměru', type:'select', options: () => ['','Na dobu neurčitou','Na dobu určitou'] },
+];
+
 const IMPORT_FIELD_TARGETS = [
   { key:'ignore', label:'— ignorovat —' },
   { key:'jmeno', label:'Jméno', apply:(r,v) => { r.personal.jmeno = String(v||'').trim(); } },
@@ -3560,6 +3592,9 @@ async function runImportBatch(){
     seqBase += 1;
     const ref = `OB-${year}-${String(seqBase).padStart(4,'0')}`;
     const record = { personal: emptyPersonal(), checklist: emptyChecklist(), personalStatus:'draft', fieldFlags:{}, returnNote:'', assignedAdmin:'', assignedOffice:'', assignedFacilityStaff:'', firstDayDismissed:false, consentGiven:false, consentAt:null };
+    Object.entries(cur.common || {}).forEach(([key, val]) => {
+      if(val) record.personal[key] = val;
+    });
     cur.headers.forEach((h, colIdx) => {
       const targetKey = cur.mapping[colIdx];
       if(!targetKey || targetKey === 'ignore') return;
