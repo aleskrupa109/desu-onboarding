@@ -1235,7 +1235,7 @@ function renderList(){
               <td>${chip(r.itDone === r.itTotal && r.itTotal>0, `${r.itDone||0}/${r.itTotal||0}`)}</td>
               ${state.role==='admin'?`<td>${urgencyChip(r)}</td><td>${adminList().length ? `<select data-list-assign="${r.id}"><option value="">— nepřiřazeno —</option>${adminList().map(a => `<option value="${esc(a)}" ${r.assignedAdmin===a?'selected':''}>${esc(a)}</option>`).join('')}</select>` : (r.assignedAdmin ? esc(r.assignedAdmin) : '<span style="color:var(--ink-faint);">—</span>')}</td>`:''}
               ${canCreate?`<td>${r.vemaExportedAt ? `<span class="chip chip-done" title="${esc(new Date(r.vemaExportedAt).toLocaleString('cs-CZ'))}">Vygenerováno</span>` : `<span class="chip chip-progress-bg">Negenerováno</span>`}</td>
-              <td style="text-align:right;"><button class="btn-delete-tiny" data-delete="${r.id}" title="Smazat spis">Smazat</button></td>`:''}
+              <td style="text-align:right;white-space:nowrap;"><button class="btn-delete-tiny" data-quickedit="${r.id}" title="Rychle doplnit základní údaje">✎</button> <button class="btn-delete-tiny" data-delete="${r.id}" title="Smazat spis">Smazat</button></td>`:''}
             </tr>
           `;
           }).join('')}
@@ -2724,6 +2724,9 @@ function attachHandlers(){
       openDetail(el.getAttribute('data-open'));
     });
   });
+  app.querySelectorAll('[data-quickedit]').forEach(el => {
+    el.addEventListener('click', (ev) => { ev.stopPropagation(); openQuickEditModal(el.getAttribute('data-quickedit')); });
+  });
   app.querySelectorAll('[data-delete]').forEach(el => {
     el.addEventListener('click', (ev) => { ev.stopPropagation(); openDeleteModal(el.getAttribute('data-delete')); });
   });
@@ -3960,6 +3963,83 @@ function openNewModal(){
     await saveRecord(id, record);
     backdrop.remove();
     state.view = 'list';
+    render();
+  });
+}
+
+async function openQuickEditModal(id){
+  const record = await loadRecord(id);
+  const idxEntry = state.index.find(e => e.id === id);
+  if(!record || !idxEntry) return;
+  const p = record.personal;
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  const opt = (val, label) => `<option value="${esc(val)}">${esc(label || val || '— vyberte —')}</option>`;
+  const workplaceOpts = ['', ...workplaceList()].map(w => `<option value="${esc(w)}" ${p.pracoviste===w?'selected':''}>${esc(w || '— vyberte —')}</option>`).join('');
+  const categoryOpts = ['', ...categoryNames()].map(c => `<option value="${esc(c)}" ${p.kategorie===c?'selected':''}>${esc(c || '— vyberte —')}</option>`).join('');
+  const positionOpts = ['', ...positionList()].map(x => `<option value="${esc(x)}" ${p.pozice===x?'selected':''}>${esc(x || '— vyberte —')}</option>`).join('');
+  const onboardingTypeOpts = ['', ...ONBOARDING_TYPES].map(t => `<option value="${esc(t)}" ${p.typ_nastupu===t?'selected':''}>${esc(t || '— vyberte —')}</option>`).join('');
+  const supervisorOpts = ['', ...supervisorList()].map(s => `<option value="${esc(s)}" ${p.nadrizeny===s?'selected':''}>${esc(s || '— vyberte —')}</option>`).join('');
+  const employmentRegimeOpts = ['', 'Pracovní poměr', 'Služební poměr'].map(v => `<option value="${esc(v)}" ${p.rezim_zamestnani===v?'selected':''}>${esc(v || '— vyberte —')}</option>`).join('');
+  const employmentScopeOpts = ['', 'Plný úvazek', 'Zkrácený úvazek'].map(v => `<option value="${esc(v)}" ${p.rozsah_uvazku===v?'selected':''}>${esc(v || '— vyberte —')}</option>`).join('');
+  backdrop.innerHTML = `
+    <div class="modal">
+      <h3>Rychlé doplnění základních údajů</h3>
+      <p style="font-size:12.5px;color:var(--ink-faint);margin:-10px 0 14px;">${esc(idxEntry.ref)} — stejná pole jako při založení nového spisu. Zbytek (osobní/mzdové údaje) doplníte v otevřeném spisu.</p>
+      <div class="field"><label>Jméno *</label><input id="qe-jmeno" type="text" value="${esc(p.jmeno||'')}"></div>
+      <div class="field"><label>Příjmení *</label><input id="qe-prijmeni" type="text" value="${esc(p.prijmeni||'')}"></div>
+      <div class="field"><label>Pracovní pozice</label><select id="qe-pozice">${positionOpts}</select></div>
+      <div class="field"><label>Pracoviště *</label><select id="qe-pracoviste">${workplaceOpts}</select></div>
+      <div class="field"><label>Typ nástupu *</label><select id="qe-typ-nastupu">${onboardingTypeOpts}</select></div>
+      <div class="field"><label>Kategorie *</label><select id="qe-kategorie">${categoryOpts}</select></div>
+      <div class="field"><label>Přímý nadřízený</label><select id="qe-nadrizeny">${supervisorOpts}</select></div>
+      <div class="field"><label>Typ úvazku</label><select id="qe-rezim">${employmentRegimeOpts}</select></div>
+      <div class="field"><label>Rozsah úvazku</label><select id="qe-rozsah">${employmentScopeOpts}</select></div>
+      <div class="field"><label>Datum nástupu</label><input id="qe-datum" type="date" value="${esc(p.datum_nastupu||'')}"></div>
+      <div id="qe-error" style="display:none;color:var(--red);font-size:12.5px;margin:-8px 0 12px;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="qe-cancel">Zrušit</button>
+        <button class="btn btn-primary" id="qe-save">Uložit</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  document.getElementById('qe-cancel').addEventListener('click', () => backdrop.remove());
+  backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) backdrop.remove(); });
+  const saveBtn = document.getElementById('qe-save');
+  let saving = false;
+  saveBtn.addEventListener('click', async () => {
+    if(saving) return;
+    const jmeno = document.getElementById('qe-jmeno').value.trim();
+    const prijmeni = document.getElementById('qe-prijmeni').value.trim();
+    const errBox = document.getElementById('qe-error');
+    if(!jmeno || !prijmeni){
+      errBox.textContent = 'Vyplňte prosím jméno a příjmení.';
+      errBox.style.display = 'block';
+      return;
+    }
+    saving = true;
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Ukládám…';
+    p.jmeno = jmeno;
+    p.prijmeni = prijmeni;
+    p.pozice = document.getElementById('qe-pozice').value.trim();
+    p.pracoviste = document.getElementById('qe-pracoviste').value;
+    p.typ_nastupu = document.getElementById('qe-typ-nastupu').value;
+    p.kategorie = document.getElementById('qe-kategorie').value;
+    p.nadrizeny = document.getElementById('qe-nadrizeny').value;
+    p.rezim_zamestnani = document.getElementById('qe-rezim').value;
+    p.rozsah_uvazku = document.getElementById('qe-rozsah').value;
+    p.datum_nastupu = document.getElementById('qe-datum').value;
+    ensureSuggestedEmail(record);
+    idxEntry.jmeno = jmeno;
+    idxEntry.prijmeni = prijmeni;
+    idxEntry.pozice = p.pozice;
+    idxEntry.pracoviste = p.pracoviste;
+    idxEntry.datumNastupu = p.datum_nastupu;
+    await saveRecord(id, record);
+    await saveIndex();
+    backdrop.remove();
     render();
   });
 }
