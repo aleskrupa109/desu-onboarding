@@ -382,7 +382,6 @@ function checklistSectionsForCategory(category, tab){
   return sections;
 }
 
-const SAMPLE_NAMES = [["Michal", "Brabec"], ["Eva", "Červinková"], ["Lukáš", "Kalecký"], ["Jaroslav", "Klaška"], ["Kamil", "Kubiš"], ["Pavel", "Machata"], ["Lucie", "Poláková"], ["Karel", "Wirth"], ["Radka", "Brožová"], ["Lenka", "Hnaníčková"], ["Hana", "Máchová"], ["Josef", "Morkus"], ["Filip", "Novosád"], ["Milan", "Svoboda"], ["Jana", "Vlčková"], ["Adam", "Balcar"], ["Petr", "Klán"], ["Simona", "Lhotáková"], ["Jiří", "Mór"], ["Kateřina", "Vrbová"], ["Alice", "Cebulová"], ["Žanet", "Hadžić"], ["Karolína", "Bartáková"], ["Radka", "Doležalová"], ["Eva", "Fialová"], ["Jana", "Machačková"], ["Ondřej", "Střítecký"], ["Ilona", "Šupejová"], ["Daniel", "Tydrych"], ["Ondřej", "Černý"], ["Martin", "Daněk"], ["Libor", "Hladký"], ["Gabriela", "Krauszová"], ["Petr", "Novák"], ["Marie", "Pokorná"], ["Petr", "Jeník"], ["Vít", "Kudláček"], ["Andrea", "Pospíšilová"], ["Michaela", "Visokaiová"], ["Vladimír", "Voldřich"], ["Milada", "Konrádová"], ["Marta", "Opletalová"], ["Michaela", "Barančinová"], ["Lenka", "Hlavičková"], ["Petra Elena", "Kubíčková"], ["Ilona", "Kunešová"], ["Václava", "Nováková"], ["Dana", "Rafflová"], ["Monika", "Smetanová"], ["Miroslav", "Baloun"], ["Hana", "Kalvodová"], ["Jiří", "Pešák"], ["Jiří", "Raška"], ["Iveta", "Šobrová"], ["Vojtěch", "Vlk"], ["Michaela", "Votápková"], ["Eva", "Aulická"], ["Hana", "Bahenská"], ["Eva", "Bergmanová"], ["Libuše", "Krupková"], ["Eliška", "Neradilová"], ["Jana", "Slonková"], ["Michaela", "Zemanová"], ["Silvie", "Juráková"], ["Jakub", "Kotrla"], ["Martin", "Marek"], ["Michaela", "Matáková"], ["Hana", "Muzáková"], ["Dana", "Vítková"], ["Tamara", "Blatová"], ["Hana", "Čechthovská"], ["Elena", "Fedrová"], ["Václav", "Nekuža"], ["Ludmila", "Rohrerová"], ["Jana", "Sapáková"], ["Petr", "Zelinka"], ["Karolína", "Bílá"], ["Jiří", "Hummel"], ["Monika", "Jourová"], ["Martina", "Kabelková"], ["Zdeňka", "Kučerová"], ["Michal", "Leskovjan"], ["Jiří", "Lhotský"], ["František", "Nantl"], ["Erik", "Nazarej"], ["Anna", "Romanchuk"], ["Hana", "Šimková"], ["Klára", "Škopková"], ["Martin", "Tomáš"], ["Tomáš", "Zvardon"]];
 
 const DEFAULT_INFO = {
   consentText: 'Pro účely personální agendy a zřízení přístupů do informačních systémů úřadu budeme zpracovávat vaše osobní údaje uvedené v tomto formuláři (identifikační a kontaktní údaje, doklady, případně údaje o rodinných příslušnících pro účely daňových slev). Správcem údajů je Dopravní a energetický stavební úřad (DESÚ), od 1. 1. 2027 Úřad rozvoje území ČR (ÚRÚ ČR). Údaje budou použity výhradně pro účely pracovněprávního vztahu a nastavení přístupů do systémů úřadu. Podrobnosti vám na vyžádání poskytne personální oddělení.',
@@ -427,7 +426,7 @@ const DEFAULT_INFO = {
   ],
 };
 
-let state = { view:'list', index:[], currentId:null, currentRecord:null, tab:'personal', loading:true, error:null, collapsed:{}, role:'hr', employeeMode:false, linkCopied:false, wizardStep:0, infoContent:null, editingInfo:false, previewingEmployee:false, returnMsgCopied:false, pendingEdit:null, filterText:'', colFilters:{pozice:'', pracoviste:'', personal:'', it:'', assigned:''}, sortKey:'created', sortDir:'desc', wizardStepError:false, editingWorkplace:null, editingFirstDayType:null, firstDayDismissPrompt:false, firstDayHiddenSession:false, settings:null, settingsDraft:null, settingsSaved:false, openItemNotes:{}, selectedExport:{}, exporting:false, hardRateLimited:false, selectedAssign:{}, bulkAssignTarget:'', bulkAssigning:false, saveStatus:null, saveStatusAt:null, standaloneMode:false, showMissingHighlights:false, userEmail:null, settingsCollapsed:{departments:true} };
+let state = { view:'list', index:[], currentId:null, currentRecord:null, tab:'personal', loading:true, error:null, collapsed:{}, role:'hr', employeeMode:false, linkCopied:false, wizardStep:0, infoContent:null, editingInfo:false, previewingEmployee:false, returnMsgCopied:false, pendingEdit:null, filterText:'', colFilters:{pozice:'', pracoviste:'', personal:'', it:'', assigned:''}, sortKey:'created', sortDir:'desc', wizardStepError:false, editingWorkplace:null, editingFirstDayType:null, firstDayDismissPrompt:false, firstDayHiddenSession:false, settings:null, settingsDraft:null, settingsSaved:false, openItemNotes:{}, selectedExport:{}, exporting:false, hardRateLimited:false, selectedAssign:{}, bulkAssignTarget:'', bulkAssigning:false, saveStatus:null, saveStatusAt:null, standaloneMode:false, showMissingHighlights:false, userEmail:null, settingsCollapsed:{departments:true}, importQueue:[], importCurrent:null };
 
 function emptyPersonal(){
   const p = {};
@@ -1060,7 +1059,7 @@ function render(){
     ${state.employeeMode ? `<div class="employee-banner">Toto je váš osobní onboardingový prostor. Vyplněné údaje uvidí personální oddělení, které je zkontroluje a případně doplní.</div>` : state.previewingEmployee ? `<div class="employee-banner">Náhled toho, co uvidí zaměstnanec. <button class="btn btn-ghost btn-sm" id="btn-exit-preview" style="margin-left:10px;">Ukončit náhled</button></div>` : renderRoleSwitch()}
     ${state.error ? `<div style="background:var(--red-tint);color:var(--red);padding:10px 14px;border-radius:3px;margin-bottom:16px;font-size:13px;">${esc(state.error)}</div>` : ''}
     </div>
-    ${state.view === 'list' ? renderList() : state.view === 'info-admin' ? renderInfoAdminPage() : state.view === 'settings' ? renderSettingsPage() : state.view === 'print-docs' ? renderPrintDocsPage() : renderDetail()}
+    ${state.view === 'list' ? renderList() : state.view === 'info-admin' ? renderInfoAdminPage() : state.view === 'settings' ? renderSettingsPage() : state.view === 'print-docs' ? renderPrintDocsPage() : state.view === 'import-mapping' ? renderImportMappingPage() : renderDetail()}
   `;
   attachHandlers();
   if(focusInfo){
@@ -1153,7 +1152,7 @@ function renderList(){
     <div class="index-toolbar">
       <h2>Rejstřík nástupů</h2>
       <div style="display:flex;gap:8px;">
-        ${canCreate && remainingSampleNames().length > 0 ? `<button class="btn btn-ghost" id="btn-seed">Načíst ukázková data (${remainingSampleNames().length})</button>` : ''}
+        ${canCreate ? `<button class="btn btn-ghost" id="btn-import-upload">Vytěžit podklady</button><input type="file" id="import-file-input" accept=".xlsx,.xls" multiple style="display:none;">` : ''}
         ${canCreate ? `<button class="btn btn-primary" id="btn-new">+ Nový nástup</button>` : ''}
       </div>
     </div>
@@ -1306,7 +1305,11 @@ function renderDetail(){
       </div>
       <div class="detail-actions">
         ${complete ? `<div class="stamp">Přístupy vyřízeny</div>` : ''}
-        ${state.role==='hr' && !state.previewingEmployee ? `<button class="btn btn-ghost btn-sm" id="btn-preview-employee">Náhled jako zaměstnanec</button><button class="btn btn-ghost btn-sm" id="btn-copy-link">${state.linkCopied ? 'Odkaz zkopírován ✓' : 'Zkopírovat odkaz pro zaměstnance'}</button>` : ''}
+        ${state.role==='hr' && !state.previewingEmployee ? (() => {
+          const hrMissing = missingHrRequiredFields(r);
+          const linkReady = hrMissing.length === 0;
+          return `<button class="btn btn-ghost btn-sm" id="btn-preview-employee">Náhled jako zaměstnanec</button><button class="btn btn-ghost btn-sm" id="btn-copy-link" ${linkReady?'':'disabled title="Nejdřív doplňte povinné údaje personálního oddělení (viz Osobní údaje)"'}>${state.linkCopied ? 'Odkaz zkopírován ✓' : 'Zkopírovat odkaz pro zaměstnance'}</button>`;
+        })() : ''}
       </div>
     </div>
     <div class="tabs">
@@ -1945,13 +1948,32 @@ function currentApproveMissing(){
   return missingRequiredFields(state.currentRecord, true);
 }
 
+function missingHrRequiredFields(record){
+  const missing = [];
+  PERSONAL_SECTIONS.forEach(sec => {
+    if(sec.owner !== 'hr') return;
+    if(sec.type === 'repeat') return;
+    sec.fields.forEach(f => {
+      if(!f.essential && !f.required) return;
+      if(f.showIf && !f.showIf(record.personal)) return;
+      const val = record.personal[f.id];
+      if(val == null || (typeof val === 'string' && val.trim() === '')){
+        missing.push({ sectionId: sec.id, section: sec.label, fieldId: f.id, label: f.label });
+      }
+    });
+  });
+  return missing;
+}
+
 const STATUS_LABEL = { draft:'Zaměstnanec ještě nevyplnil / neodeslal', submitted:'Čeká na kontrolu personálním oddělením', returned:'Vráceno zaměstnanci k doplnění', reviewed:'Zkontrolováno a schváleno' };
 
 function renderHrStatusPanel(r){
   const status = r.personalStatus || 'draft';
+  const hrMissingForLabel = status === 'draft' ? missingHrRequiredFields(r) : [];
+  const statusLabel = hrMissingForLabel.length > 0 ? 'K doplnění personálním oddělením' : STATUS_LABEL[status];
   const flagCount = Object.keys(r.fieldFlags||{}).length;
   let html = `<div class="review-row ${status==='reviewed'?'done':''}">
-    <span>Stav: <strong>${esc(STATUS_LABEL[status])}</strong></span>
+    <span>Stav: <strong>${esc(statusLabel)}</strong></span>
   </div>`;
   html += `<div class="hr-status-actions">`;
   if(status === 'submitted' || status === 'returned'){
@@ -2110,6 +2132,46 @@ function buildDocBHtml(r){
     </div>
   `;
 }
+
+function renderImportMappingPage(){
+  const cur = state.importCurrent;
+  if(!cur) return `<p>Není co mapovat.</p>`;
+  const previewRows = cur.rows.slice(0, 3);
+  return `
+    <div class="no-print" style="margin-bottom:16px;">
+      <button class="btn btn-ghost btn-sm" id="btn-import-cancel">← Zrušit vytěžování</button>
+    </div>
+    <h2 style="font-family:var(--font-display);font-size:1.4rem;margin:0 0 6px;">Vytěžení podkladů — ${esc(cur.fileName)}</h2>
+    <p style="font-size:13px;color:var(--ink-soft);margin:0 0 16px;">Nalezeno ${cur.rows.length} řádků. Zkontrolujte prosím u každého sloupce, na jaký údaj se má namapovat — appka to zkusila odhadnout sama, ale stojí za to to zkontrolovat, hlavně u sloupců, které nešly jednoznačně rozpoznat.</p>
+    <div class="panel" style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr>
+          <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--line-strong);">Sloupec v souboru</th>
+          <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--line-strong);">Ukázka hodnoty</th>
+          <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--line-strong);">Namapovat na</th>
+        </tr></thead>
+        <tbody>
+          ${cur.headers.map((h,i) => `
+            <tr>
+              <td style="padding:6px 8px;border-bottom:1px solid var(--line);font-weight:600;">${esc(h || '(bez názvu)')}</td>
+              <td style="padding:6px 8px;border-bottom:1px solid var(--line);color:var(--ink-faint);">${previewRows.map(r => esc(r[i]==null?'—':String(r[i]))).join(' · ')}</td>
+              <td style="padding:6px 8px;border-bottom:1px solid var(--line);">
+                <select data-import-map="${i}">
+                  ${IMPORT_FIELD_TARGETS.map(t => `<option value="${t.key}" ${cur.mapping[i]===t.key?'selected':''}>${esc(t.label)}</option>`).join('')}
+                </select>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:16px;">
+      <button class="btn btn-primary" id="btn-import-confirm">Vytěžit a založit ${cur.rows.length} nástupů</button>
+    </div>
+    ${state.importQueue.length > 0 ? `<p style="font-size:12.5px;color:var(--ink-faint);margin-top:10px;">Po dokončení bude následovat další soubor: ${esc(state.importQueue[0].fileName)} (${state.importQueue.length > 1 ? `a další ${state.importQueue.length-1}` : ''})</p>` : ''}
+  `;
+}
+
 
 function renderPrintDocsPage(){
   const r = state.currentRecord;
@@ -2535,18 +2597,70 @@ function attachHandlers(){
     render();
   });
 
-  const seedBtn = document.getElementById('btn-seed');
-  if(seedBtn) seedBtn.addEventListener('click', async () => {
-    seedBtn.disabled = true;
-    seedBtn.textContent = `Načítám…`;
+  const importUploadBtn = document.getElementById('btn-import-upload');
+  if(importUploadBtn) importUploadBtn.addEventListener('click', () => {
+    document.getElementById('import-file-input').click();
+  });
+  const importFileInput = document.getElementById('import-file-input');
+  if(importFileInput) importFileInput.addEventListener('change', async (e) => {
+    const files = [...e.target.files];
+    e.target.value = '';
+    if(files.length === 0) return;
+    const queue = [];
+    for(const file of files){
+      try{
+        const { headers, rows } = await readXlsxFile(file);
+        if(headers.length === 0 || rows.length === 0){
+          state.error = `Soubor „${file.name}" neobsahuje žádná data k vytěžení (očekává se hlavička v prvním řádku).`;
+          continue;
+        }
+        const mapping = {};
+        headers.forEach((h,i) => { mapping[i] = guessFieldTarget(h); });
+        queue.push({ fileName: file.name, headers, rows, mapping });
+      }catch(err){
+        console.error('readXlsxFile failed:', err);
+        state.error = `Nepodařilo se přečíst soubor „${file.name}": ${err.message}`;
+      }
+    }
+    if(queue.length > 0){
+      state.importCurrent = queue.shift();
+      state.importQueue = queue;
+      state.view = 'import-mapping';
+    }
+    render();
+  });
+
+  app.querySelectorAll('[data-import-map]').forEach(sel => {
+    sel.addEventListener('change', () => {
+      state.importCurrent.mapping[sel.getAttribute('data-import-map')] = sel.value;
+    });
+  });
+  const importCancelBtn = document.getElementById('btn-import-cancel');
+  if(importCancelBtn) importCancelBtn.addEventListener('click', () => {
+    state.importCurrent = null;
+    state.importQueue = [];
+    state.view = 'list';
+    render();
+  });
+  const importConfirmBtn = document.getElementById('btn-import-confirm');
+  if(importConfirmBtn) importConfirmBtn.addEventListener('click', async () => {
+    importConfirmBtn.disabled = true;
+    importConfirmBtn.textContent = 'Zakládám…';
     try{
-      const result = await seedSampleData((done, total) => { seedBtn.textContent = `Načítám… (${done}/${total})`; });
-      if(result.interrupted){
-        state.error = `Import byl přerušen kvůli limitu požadavků na úložiště — uloženo ${result.saved} z ${result.total}. Znovu načtěte artefakt (obnovte stránku) a klikněte na „Načíst ukázková data" znovu — už uložené záznamy se přeskočí, doplní se jen zbytek.`;
+      const result = await runImportBatch();
+      if(state.importQueue.length > 0){
+        state.importCurrent = state.importQueue.shift();
+        state.view = 'import-mapping';
+      } else {
+        state.importCurrent = null;
+        state.view = 'list';
+      }
+      if(result.saved < result.total){
+        state.error = `Založeno ${result.saved} z ${result.total} nástupů — u zbytku se uložení nezdařilo, zkuste to prosím znovu.`;
       }
     }catch(e){
-      console.error('seedSampleData failed:', e);
-      state.error = 'Import ukázkových dat se nezdařil. Zkuste to prosím znovu.';
+      console.error('runImportBatch failed:', e);
+      state.error = 'Vytěžení se nezdařilo. Zkuste to prosím znovu.';
     }
     render();
   });
@@ -3278,69 +3392,144 @@ function openReturnModal(){
   });
 }
 
-const SAMPLE_POSITIONS = ['Referent','Analytik','Metodik','Právník','Ekonom','Architekt','Specialista IT','Personalista','Asistent/ka','Vedoucí oddělení'];
-function randomChoice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
-function randomDate(daysMin, daysMax){
-  const d = new Date();
-  d.setDate(d.getDate() + Math.floor(Math.random()*(daysMax-daysMin+1)) + daysMin);
-  return d.toISOString().slice(0,10);
+const IMPORT_FIELD_TARGETS = [
+  { key:'ignore', label:'— ignorovat —' },
+  { key:'jmeno', label:'Jméno', apply:(r,v) => { r.personal.jmeno = String(v||'').trim(); } },
+  { key:'prijmeni', label:'Příjmení', apply:(r,v) => { r.personal.prijmeni = String(v||'').trim(); } },
+  { key:'plne_jmeno', label:'Příjmení Jméno, Titul (rozdělit automaticky)', apply:(r,v) => {
+      const raw = String(v||'').trim();
+      const parts = raw.split(',');
+      const namePart = (parts[0]||'').trim();
+      const titlePart = parts.slice(1).join(',').trim();
+      if(titlePart) r.personal.titul_pred = titlePart;
+      const tokens = namePart.split(/\s+/).filter(Boolean);
+      if(tokens.length >= 2){
+        r.personal.jmeno = tokens[tokens.length-1];
+        r.personal.prijmeni = tokens.slice(0,-1).join(' ');
+      } else if(tokens.length === 1){
+        r.personal.prijmeni = tokens[0];
+      }
+    }
+  },
+  { key:'titul_pred', label:'Titul (před jménem)', apply:(r,v) => { r.personal.titul_pred = String(v||'').trim(); } },
+  { key:'titul_za', label:'Titul (za jménem)', apply:(r,v) => { r.personal.titul_za = String(v||'').trim(); } },
+  { key:'email_soukromy', label:'E-mail (soukromý)', apply:(r,v) => { r.personal.email_soukromy = String(v||'').trim(); } },
+  { key:'email_prideleny', label:'Přidělený pracovní e-mail', apply:(r,v) => { r.checklist.email.value = String(v||'').trim(); if(r.checklist.email.value) r.checklist.email.checked = true; } },
+  { key:'telefon_soukromy', label:'Telefon (soukromý)', apply:(r,v) => { r.personal.telefon_soukromy = String(v||'').trim(); } },
+  { key:'osobni_cislo', label:'Osobní číslo', apply:(r,v) => { r.personal.osobni_cislo = String(v||'').trim(); } },
+  { key:'odbor_oddeleni', label:'Odbor / oddělení', apply:(r,v) => { r.personal.odbor_oddeleni = String(v||'').trim(); } },
+  { key:'pozice', label:'Pracovní pozice', apply:(r,v) => { r.personal.pozice = String(v||'').trim(); } },
+  { key:'rezim_zamestnani', label:'Typ úvazku (PP/SP → Pracovní/Služební poměr)', apply:(r,v) => {
+      const t = String(v||'').trim().toUpperCase();
+      if(t === 'SP' || t.includes('SLUŽEBN')) r.personal.rezim_zamestnani = 'Služební poměr';
+      else if(t === 'PP' || t.includes('PRACOVN')) r.personal.rezim_zamestnani = 'Pracovní poměr';
+    }
+  },
+  { key:'rozsah_uvazku', label:'Výše úvazku (číslo, např. 1 nebo 0,5)', apply:(r,v) => {
+      const num = parseFloat(String(v==null?'':v).replace(',','.'));
+      if(!isNaN(num)){
+        r.personal.uvazek = String(num);
+        r.personal.rozsah_uvazku = num >= 1 ? 'Plný úvazek' : 'Zkrácený úvazek';
+      }
+    }
+  },
+  { key:'doba_trvani', label:'Doba trvání poměru („neurčito“ / datum)', apply:(r,v) => {
+      const s = String(v==null?'':v).trim().toLowerCase();
+      if(!s) return;
+      if(s.includes('neurč')) r.personal.doba_trvani_pomeru = 'Na dobu neurčitou';
+      else r.personal.doba_trvani_pomeru = 'Na dobu určitou';
+    }
+  },
+  { key:'datum_nastupu', label:'Datum nástupu', apply:(r,v) => {
+      if(v instanceof Date) r.personal.datum_nastupu = v.toISOString().slice(0,10);
+      else if(v) r.personal.datum_nastupu = String(v).trim();
+    }
+  },
+  { key:'poznamka', label:'Poznámka (→ Kurzy a dovednosti)', apply:(r,v) => { r.personal.kurzy_dovednosti = String(v||'').trim(); } },
+];
+
+function guessFieldTarget(header){
+  const norm = String(header||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const has = (...subs) => subs.some(s => norm.includes(s));
+  if(has('prijmeni') && has('jmeno')) return 'plne_jmeno';
+  if(has('prijmeni')) return 'prijmeni';
+  if(has('jmeno')) return 'jmeno';
+  if(has('titul') && has('za')) return 'titul_za';
+  if(has('titul')) return 'titul_pred';
+  if(has('mail')) return 'email_soukromy';
+  if(has('telefon','mobil')) return 'telefon_soukromy';
+  if(has('osobni cislo')) return 'osobni_cislo';
+  if(has('oddeleni','utvar','organizacni')) return 'odbor_oddeleni';
+  if(has('pozice')) return 'pozice';
+  if(has('pomer','sluzebni')) return 'rezim_zamestnani';
+  if(has('uvazek')) return 'rozsah_uvazku';
+  if(has('smlouva')) return 'doba_trvani';
+  if(has('nastup')) return 'datum_nastupu';
+  if(has('poznamka')) return 'poznamka';
+  return 'ignore';
 }
 
-function remainingSampleNames(){
-  const already = new Set(state.index.map(e => `${e.jmeno}|${e.prijmeni}`));
-  return SAMPLE_NAMES.filter(([j,p]) => !already.has(`${j}|${p}`));
+async function readXlsxFile(file){
+  const buffer = await file.arrayBuffer();
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer);
+  const ws = wb.worksheets[0];
+  if(!ws) return { headers:[], rows:[] };
+  const rawHeader = ws.getRow(1).values;
+  const headers = (rawHeader.slice(1)).map(v => {
+    if(v && typeof v === 'object' && v.richText) return v.richText.map(t=>t.text).join('');
+    return v == null ? '' : String(v).trim();
+  });
+  const lastCol = headers.length;
+  const rows = [];
+  for(let r=2; r<=ws.rowCount; r++){
+    const raw = ws.getRow(r).values.slice(1, lastCol+1);
+    const isEmpty = raw.every(v => v==null || String(v).trim()==='');
+    if(isEmpty) continue;
+    const rowVals = [];
+    for(let i=0;i<lastCol;i++){
+      let v = raw[i];
+      if(v && typeof v === 'object' && v.richText) v = v.richText.map(t=>t.text).join('');
+      else if(v && typeof v === 'object' && v.text) v = v.text;
+      rowVals.push(v);
+    }
+    rows.push(rowVals);
+  }
+  return { headers, rows };
 }
 
-async function seedSampleData(onProgress){
-  const statuses = ['draft','draft','submitted','submitted','returned','reviewed','reviewed'];
+async function runImportBatch(){
+  const cur = state.importCurrent;
   const year = new Date().getFullYear();
   let seqBase = state.index.filter(e => e.ref && e.ref.startsWith('OB-'+year)).length;
-  const namesToImport = remainingSampleNames();
   const batch = [];
-  namesToImport.forEach(([jmeno, prijmeni], i) => {
+  cur.rows.forEach((row, i) => {
     const id = 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2,8) + i;
     seqBase += 1;
     const ref = `OB-${year}-${String(seqBase).padStart(4,'0')}`;
-    const status = randomChoice(statuses);
-    const record = { personal: emptyPersonal(), checklist: emptyChecklist(), personalStatus: status, fieldFlags:{}, returnNote:'' };
-    record.personal.jmeno = jmeno;
-    record.personal.prijmeni = prijmeni;
-    record.personal.pozice = randomChoice(positionList());
-    record.personal.pracoviste = randomChoice(workplaceList());
-    record.personal.kategorie = randomChoice(categoryNames());
-    record.personal.typ_nastupu = randomChoice(ONBOARDING_TYPES);
-    record.personal.datum_nastupu = randomDate(1, 60);
-    const fillRatio = status === 'reviewed' ? 1 : status === 'submitted' ? (Math.random()*0.6+0.2) : status === 'returned' ? (Math.random()*0.5) : (Math.random()*0.3);
-    Object.keys(record.checklist).forEach(k => { if(Math.random() < fillRatio) record.checklist[k].checked = true; });
-    if(status === 'returned'){
-      record.returnNote = 'Zkontrolujte prosím vyznačené údaje.';
-      record.fieldFlags['rodne_cislo'] = 'chybí vyplnit';
-    }
+    const record = { personal: emptyPersonal(), checklist: emptyChecklist(), personalStatus:'draft', fieldFlags:{}, returnNote:'', assignedAdmin:'', assignedOffice:'', assignedFacilityStaff:'', firstDayDismissed:false, consentGiven:false, consentAt:null };
+    cur.headers.forEach((h, colIdx) => {
+      const targetKey = cur.mapping[colIdx];
+      if(!targetKey || targetKey === 'ignore') return;
+      const target = IMPORT_FIELD_TARGETS.find(t => t.key === targetKey);
+      if(target && target.apply){
+        try{ target.apply(record, row[colIdx]); }catch(e){ console.error('import apply failed for column', h, e); }
+      }
+    });
     const {total, done} = checklistTotals(record.checklist, record.personal.kategorie, 'it');
     batch.push({
       id, record,
-      entry: { id, ref, jmeno, prijmeni, pozice: record.personal.pozice, pracoviste: record.personal.pracoviste, datumNastupu: record.personal.datum_nastupu, created: Date.now()+i, personalStatus: status, itTotal: total, itDone: done }
+      entry: { id, ref, jmeno: record.personal.jmeno||'', prijmeni: record.personal.prijmeni||'', pozice: record.personal.pozice||'', pracoviste: record.personal.pracoviste||'', datumNastupu: record.personal.datum_nastupu||'', created: Date.now()+i, personalStatus:'draft', itTotal: total, itDone: done }
     });
   });
-  state.hardRateLimited = false;
-  const DELAY_MS = 1500;
   let saved = 0;
-  for(let i=0; i<batch.length; i++){
-    const item = batch[i];
+  for(const item of batch){
     state.index.push(item.entry);
     const ok = await saveRecord(item.id, item.record);
-    if(ok){
-      saved++;
-    } else {
-      const idx = state.index.findIndex(e => e.id === item.id);
-      if(idx !== -1) state.index.splice(idx, 1);
-    }
-    if(onProgress) onProgress(i+1, batch.length);
-    if(state.hardRateLimited) break;
-    await new Promise(res => setTimeout(res, DELAY_MS));
+    if(ok){ saved++; } else { const idx = state.index.findIndex(e=>e.id===item.id); if(idx!==-1) state.index.splice(idx,1); }
   }
   await saveIndex();
-  return { saved, total: batch.length, interrupted: state.hardRateLimited };
+  return { saved, total: batch.length };
 }
 
 // ==== Skutečná struktura Zaváděcího formuláře (ZHLAV) + satelitní tabulky ====
