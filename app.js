@@ -2556,6 +2556,15 @@ function attachHandlers(){
 
   const saveSettingsBtn = document.getElementById('btn-save-settings');
   if(saveSettingsBtn) saveSettingsBtn.addEventListener('click', async () => {
+    const listFields = [
+      ['workplaces','Pracoviště'], ['positions','Pracovní pozice'], ['admins','Administrátoři systémů'],
+      ['supervisors','Nadřízení'], ['departments','Odbory / oddělení'], ['facilityStaff','Pracovníci provozu'],
+    ];
+    const shrinking = listFields.filter(([k]) => (state.settings[k]||[]).length >= 3 && (state.settingsDraft[k]||[]).length === 0);
+    if(shrinking.length > 0){
+      const names = shrinking.map(([,label]) => label).join(', ');
+      if(!confirm(`Pozor: chystáte se uložit prázdný seznam u „${names}" — dřív tam přitom položky byly. Opravdu chcete pokračovat a smazat je?`)) return;
+    }
     state.settings = JSON.parse(JSON.stringify(state.settingsDraft));
     await saveSettings();
     state.settingsDraft = null;
