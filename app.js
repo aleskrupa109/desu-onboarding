@@ -92,6 +92,23 @@ const DEFAULT_CATEGORIES = [
 const SYSTEM_URL_KEYS = ['vema','vita','espis','issr','czechpoint','katastr','muzo'];
 const DEFAULT_SYSTEM_URLS = {};
 const DEFAULT_SYSTEM_TYPES = {};
+
+const SETTINGS_RESET_OPTIONS = [
+  { key:'workplaces', label:'Pracoviště', getDefault: () => [...DEFAULT_WORKPLACES] },
+  { key:'positions', label:'Pracovní pozice', getDefault: () => [...DEFAULT_POSITIONS] },
+  { key:'departments', label:'Odbory / oddělení', getDefault: () => [...DEFAULT_DEPARTMENTS] },
+  { key:'supervisors', label:'Nadřízení', getDefault: () => [...DEFAULT_SUPERVISORS] },
+  { key:'admins', label:'Administrátoři systémů', getDefault: () => [...DEFAULT_ADMINS] },
+  { key:'facilityStaff', label:'Pracovníci provozu', getDefault: () => [...DEFAULT_FACILITY_STAFF] },
+  { key:'categories', label:'Kategorie a přiřazené systémy', getDefault: () => JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)) },
+  { key:'offices', label:'Kanceláře podle budovy', getDefault: () => ({...DEFAULT_OFFICES}) },
+  { key:'workplaceVemaCodes', label:'Kódy pracovišť pro Vemu', getDefault: () => ({...DEFAULT_WORKPLACE_VEMA_CODES}) },
+  { key:'workplaceLocations', label:'Umístění pracovišť (okres/obec/sídlo)', getDefault: () => ({...DEFAULT_WORKPLACE_LOCATIONS}) },
+  { key:'vemaConstants', label:'Pevné hodnoty pro export do Vemy', getDefault: () => ({}) },
+  { key:'systemUrls', label:'Adresy systémů', getDefault: () => ({...DEFAULT_SYSTEM_URLS}) },
+  { key:'systemTypes', label:'Typy adres systémů (web/plocha)', getDefault: () => ({...DEFAULT_SYSTEM_TYPES}) },
+];
+
 function systemUrls(){ return (state.settings && state.settings.systemUrls) || DEFAULT_SYSTEM_URLS; }
 function systemTypes(){ return (state.settings && state.settings.systemTypes) || DEFAULT_SYSTEM_TYPES; }
 function workplaceList(){ return (state.settings && state.settings.workplaces) || DEFAULT_WORKPLACES; }
@@ -1738,6 +1755,16 @@ function renderSettingsPage(){
       <h4 style="font-family:var(--font-display);font-size:1.125rem;margin:0 0 8px;color:var(--red);">Nebezpečná zóna</h4>
       <p style="font-size:13px;color:var(--ink-soft);margin:0 0 12px;">Smaže úplně všechny onboardingové spisy v rejstříku (${state.index.length}) — např. při přegenerování ukázkových dat. Tuto akci nelze vrátit zpět.</p>
       <button class="btn btn-danger" id="btn-delete-all" ${state.index.length===0?'disabled':''}>Smazat všechny spisy</button>
+
+      <hr style="margin:20px 0;border:none;border-top:1px solid var(--line);">
+
+      <p style="font-size:13px;color:var(--ink-soft);margin:0 0 10px;">Resetovat vybranou část nastavení zpět na výchozí hodnoty (nepřepisuje se hned — po výběru zkontrolujte výsledek výše a potvrďte tlačítkem „Uložit nastavení").</p>
+      <div class="contact-edit-row" style="grid-template-columns:1fr auto;">
+        <select id="settings-reset-select">
+          ${SETTINGS_RESET_OPTIONS.map(o => `<option value="${o.key}">${esc(o.label)}</option>`).join('')}
+        </select>
+        <button class="btn btn-danger" id="btn-settings-reset">Resetovat vybranou sekci</button>
+      </div>
     </div>
   `;
 }
@@ -2406,6 +2433,16 @@ function attachHandlers(){
 
   const deleteAllBtn = document.getElementById('btn-delete-all');
   if(deleteAllBtn) deleteAllBtn.addEventListener('click', openDeleteAllModal);
+
+  const settingsResetBtn = document.getElementById('btn-settings-reset');
+  if(settingsResetBtn) settingsResetBtn.addEventListener('click', () => {
+    const select = document.getElementById('settings-reset-select');
+    const opt = SETTINGS_RESET_OPTIONS.find(o => o.key === select.value);
+    if(!opt) return;
+    if(!confirm(`Opravdu resetovat sekci „${opt.label}" na výchozí hodnoty? Projeví se to až po uložení tlačítkem „Uložit nastavení".`)) return;
+    state.settingsDraft[opt.key] = opt.getDefault();
+    render();
+  });
 
   app.querySelectorAll('[data-export-select]').forEach(el => {
     el.addEventListener('click', (ev) => ev.stopPropagation());
