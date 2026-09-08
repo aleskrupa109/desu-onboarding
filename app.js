@@ -427,7 +427,7 @@ const DEFAULT_INFO = {
   ],
 };
 
-let state = { view:'list', index:[], currentId:null, currentRecord:null, tab:'personal', loading:true, error:null, collapsed:{}, role:'hr', employeeMode:false, linkCopied:false, wizardStep:0, infoContent:null, editingInfo:false, previewingEmployee:false, returnMsgCopied:false, pendingEdit:null, filterText:'', colFilters:{pozice:'', pracoviste:'', personal:'', it:'', assigned:''}, sortKey:'created', sortDir:'desc', wizardStepError:false, editingWorkplace:null, editingFirstDayType:null, firstDayDismissPrompt:false, firstDayHiddenSession:false, settings:null, settingsDraft:null, settingsSaved:false, openItemNotes:{}, selectedExport:{}, exporting:false, hardRateLimited:false, selectedAssign:{}, bulkAssignTarget:'', bulkAssigning:false, saveStatus:null, saveStatusAt:null, standaloneMode:false, showMissingHighlights:false, userEmail:null };
+let state = { view:'list', index:[], currentId:null, currentRecord:null, tab:'personal', loading:true, error:null, collapsed:{}, role:'hr', employeeMode:false, linkCopied:false, wizardStep:0, infoContent:null, editingInfo:false, previewingEmployee:false, returnMsgCopied:false, pendingEdit:null, filterText:'', colFilters:{pozice:'', pracoviste:'', personal:'', it:'', assigned:''}, sortKey:'created', sortDir:'desc', wizardStepError:false, editingWorkplace:null, editingFirstDayType:null, firstDayDismissPrompt:false, firstDayHiddenSession:false, settings:null, settingsDraft:null, settingsSaved:false, openItemNotes:{}, selectedExport:{}, exporting:false, hardRateLimited:false, selectedAssign:{}, bulkAssignTarget:'', bulkAssigning:false, saveStatus:null, saveStatusAt:null, standaloneMode:false, showMissingHighlights:false, userEmail:null, settingsCollapsed:{departments:true} };
 
 function emptyPersonal(){
   const p = {};
@@ -1563,6 +1563,31 @@ function renderInfoAdminPage(){
   `;
 }
 
+function toCsvValue(v){ return `"${String(v==null?'':v).replace(/"/g,'""')}"`; }
+function downloadCsv(filename, headerCols, rows){
+  const csv = [headerCols.map(toCsvValue).join(','), ...rows.map(r => r.map(toCsvValue).join(','))].join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function settingsPanelStart(key, title, csv){
+  if(!state.settingsCollapsed) state.settingsCollapsed = {};
+  const collapsed = !!state.settingsCollapsed[key];
+  const csvBtn = csv ? `<button type="button" class="btn btn-ghost btn-sm settings-csv-btn" data-settings-csv="${esc(csv.field)}" data-settings-csv-label="${esc(csv.label)}">Export CSV</button>` : '';
+  return `
+    <div class="settings-panel-head" data-settings-toggle="${key}">
+      <h4 style="font-family:var(--font-display);font-size:1.125rem;">${esc(title)}</h4>
+      ${csvBtn}
+      <span class="settings-toggle-arrow ${collapsed?'collapsed':''}">▾</span>
+    </div>
+    <div class="settings-panel-body" style="${collapsed?'display:none;':''}">
+  `;
+}
+function settingsPanelEnd(){ return `</div>`; }
+
 function renderSettingsPage(){
   if(!state.settingsDraft) state.settingsDraft = JSON.parse(JSON.stringify(state.settings));
   const draft = state.settingsDraft;
@@ -1572,13 +1597,14 @@ function renderSettingsPage(){
     <h2 style="font-family:var(--font-display);font-size:1.5rem;font-weight:600;margin:0 0 16px;">Nastavení</h2>
 
     <div class="panel" style="margin-bottom:20px;">
-      <h4 style="font-family:var(--font-display);font-size:1.125rem;margin:0 0 8px;">Obsah pro zaměstnance</h4>
+      ${settingsPanelStart('info', 'Obsah pro zaměstnance')}
       <p style="font-size:13px;color:var(--ink-soft);margin:0 0 12px;">Kontakty, informace k jednotlivým pracovištím a obecné karty v záložce „Co potřebujete vědět".</p>
       <button class="btn btn-ghost btn-sm" id="btn-goto-info-admin">Upravit obsah →</button>
+      ${settingsPanelEnd()}
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <h4 style="font-family:var(--font-display);font-size:1.125rem;margin:0 0 12px;">Pracoviště</h4>
+      ${settingsPanelStart('wp', 'Pracoviště', {field:'workplaces', label:'Pracoviště'})}
       ${draft.workplaces.map((w,i) => `
         <div class="contact-edit-row" style="grid-template-columns:1fr auto;">
           <input data-wp-input="${i}" value="${esc(w)}" placeholder="Název pracoviště">
@@ -1586,10 +1612,11 @@ function renderSettingsPage(){
         </div>
       `).join('')}
       <button class="btn btn-ghost btn-sm" type="button" id="btn-wp-add">+ Přidat pracoviště</button>
+      ${settingsPanelEnd()}
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <h4 style="font-family:var(--font-display);font-size:1.125rem;margin:0 0 12px;">Pracovní pozice</h4>
+      ${settingsPanelStart('pos', 'Pracovní pozice', {field:'positions', label:'Pracovní pozice'})}
       ${draft.positions.map((w,i) => `
         <div class="contact-edit-row" style="grid-template-columns:1fr auto;">
           <input data-pos-input="${i}" value="${esc(w)}" placeholder="Název pozice">
@@ -1597,10 +1624,11 @@ function renderSettingsPage(){
         </div>
       `).join('')}
       <button class="btn btn-ghost btn-sm" type="button" id="btn-pos-add">+ Přidat pozici</button>
+      ${settingsPanelEnd()}
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <h4 style="font-family:var(--font-display);font-size:1.125rem;margin:0 0 4px;">Administrátoři systémů</h4>
+      ${settingsPanelStart('admins', 'Administrátoři systémů', {field:'admins', label:'Administrátoři systémů'})}
       <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 12px;">Slouží k přiřazování spisů — kdo z administrátorů má daný nástup na starosti.</p>
       ${draft.admins.map((w,i) => `
         <div class="contact-edit-row" style="grid-template-columns:1fr auto;">
@@ -1609,10 +1637,11 @@ function renderSettingsPage(){
         </div>
       `).join('')}
       <button class="btn btn-ghost btn-sm" type="button" id="btn-admin-add">+ Přidat administrátora</button>
+      ${settingsPanelEnd()}
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <h4 style="font-family:var(--font-display);font-size:1.125rem;margin:0 0 4px;">Nadřízení</h4>
+      ${settingsPanelStart('supervisors', 'Nadřízení', {field:'supervisors', label:'Nadřízení'})}
       <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 12px;">Seznam pro výběr přímého nadřízeného v sekci Pracovní poměr.</p>
       ${draft.supervisors.map((w,i) => `
         <div class="contact-edit-row" style="grid-template-columns:1fr auto;">
@@ -1621,10 +1650,11 @@ function renderSettingsPage(){
         </div>
       `).join('')}
       <button class="btn btn-ghost btn-sm" type="button" id="btn-supervisor-add">+ Přidat nadřízeného</button>
+      ${settingsPanelEnd()}
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <h4 style="font-family:var(--font-display);font-size:1.125rem;margin:0 0 4px;">Odbory / oddělení</h4>
+      ${settingsPanelStart('departments', 'Odbory / oddělení', {field:'departments', label:'Odbory / oddělení'})}
       <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 12px;">Seznam pro výběr odboru/oddělení v sekci Pracovní poměr.</p>
       ${draft.departments.map((w,i) => `
         <div class="contact-edit-row" style="grid-template-columns:1fr auto;">
@@ -1633,10 +1663,11 @@ function renderSettingsPage(){
         </div>
       `).join('')}
       <button class="btn btn-ghost btn-sm" type="button" id="btn-department-add">+ Přidat odbor / oddělení</button>
+      ${settingsPanelEnd()}
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <h4 style="font-family:var(--font-display);font-size:1.125rem;margin:0 0 4px;">Pracovníci provozu</h4>
+      ${settingsPanelStart('facility', 'Pracovníci provozu', {field:'facilityStaff', label:'Pracovníci provozu'})}
       <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 12px;">Slouží k přiřazování spisů v záložce Provoz — kdo má daný nástup po stránce vybavení a kanceláře na starosti.</p>
       ${draft.facilityStaff.map((w,i) => `
         <div class="contact-edit-row" style="grid-template-columns:1fr auto;">
@@ -1645,10 +1676,11 @@ function renderSettingsPage(){
         </div>
       `).join('')}
       <button class="btn btn-ghost btn-sm" type="button" id="btn-facility-add">+ Přidat pracovníka provozu</button>
+      ${settingsPanelEnd()}
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <h4 style="font-family:var(--font-display);font-size:1.125rem;margin:0 0 4px;">Kód pracoviště pro Vemu</h4>
+      ${settingsPanelStart('vemacodes', 'Kód pracoviště pro Vemu')}
       <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 12px;">Kód dle číselníku tklc a umístění pracoviště — vyplní se automaticky při generování Zaváděcího formuláře místo textového názvu pracoviště.</p>
       ${workplaceList().map(w => `
         <div style="margin-bottom:14px;">
@@ -1661,10 +1693,11 @@ function renderSettingsPage(){
           </div>
         </div>
       `).join('')}
+      ${settingsPanelEnd()}
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <h4 style="font-family:var(--font-display);font-size:1.125rem;margin:0 0 4px;">Pevné hodnoty pro export do Vemy</h4>
+      ${settingsPanelStart('vemaconst', 'Pevné hodnoty pro export do Vemy')}
       <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 12px;">Hodnoty stejné pro všechny zaměstnance úřadu — vyplňte jednou, appka je pak sama doplní do každého generovaného Zaváděcího formuláře.</p>
       <div class="contact-edit-row" style="grid-template-columns:280px 1fr;">
         <label style="font-size:13px;align-self:center;">Zaměstnanec ve státní správě</label>
@@ -1691,10 +1724,11 @@ function renderSettingsPage(){
         <label style="font-size:13px;align-self:center;">Délka průměrného týdne (hodiny)</label>
         <input data-vemaconst-input="pruths" value="${esc(draft.vemaConstants.pruths||'40')}" placeholder="např. 40">
       </div>
+      ${settingsPanelEnd()}
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <h4 style="font-family:var(--font-display);font-size:1.125rem;margin:0 0 4px;">Kanceláře podle budovy</h4>
+      ${settingsPanelStart('offices', 'Kanceláře podle budovy')}
       <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 12px;">Seznam kanceláří pro každé pracoviště — v záložce Provoz se zaměstnanci nabídnou jen kanceláře jeho pracoviště.</p>
       ${workplaceList().map(w => `
         <div style="margin-bottom:14px;">
@@ -1708,10 +1742,11 @@ function renderSettingsPage(){
           <button class="btn btn-ghost btn-sm" type="button" data-office-add="${esc(w)}">+ Přidat kancelář</button>
         </div>
       `).join('')}
+      ${settingsPanelEnd()}
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <h4 style="font-family:var(--font-display);font-size:1.125rem;margin:0 0 4px;">Adresy systémů</h4>
+      ${settingsPanelStart('sysurls', 'Adresy systémů')}
       <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 12px;">U webových aplikací vyplňte adresu (URL) — zobrazí se zaměstnanci jako odkaz. U systémů, které se spouští ikonou z počítače (ne z prohlížeče), přepněte na „Plocha" — adresa se pak nenabízí a zaměstnanci se místo ní zobrazí informace, že se aplikace spouští z plochy.</p>
       ${SYSTEM_URL_KEYS.map(id => {
         const sec = CHECKLIST_SECTIONS.find(s => s.id === id);
@@ -1725,10 +1760,11 @@ function renderSettingsPage(){
           <input data-sysurl-input="${id}" value="${esc(draft.systemUrls[id]||'')}" placeholder="https://…" ${type==='desktop'?'disabled':''}>
         </div>`;
       }).join('')}
+      ${settingsPanelEnd()}
     </div>
 
     <div class="panel" style="margin-bottom:20px;">
-      <h4 style="font-family:var(--font-display);font-size:1.125rem;margin:0 0 4px;">Kategorie a přiřazené systémy</h4>
+      ${settingsPanelStart('categories', 'Kategorie a přiřazené systémy')}
       <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 14px;">Majetek, IT nastavení, Entra ID, Whatspot, Outlook a Školení/BOZP platí pro všechny kategorie automaticky a zde se nedají vypnout.</p>
       ${draft.categories.map((cat, ci) => `
         <div style="border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px;">
@@ -1747,6 +1783,7 @@ function renderSettingsPage(){
         </div>
       `).join('')}
       <button class="btn btn-ghost btn-sm" type="button" id="btn-cat-add">+ Přidat kategorii</button>
+      ${settingsPanelEnd()}
     </div>
 
     <button class="btn btn-primary" id="btn-save-settings">Uložit nastavení</button>
@@ -2442,6 +2479,24 @@ function attachHandlers(){
     if(!confirm(`Opravdu resetovat sekci „${opt.label}" na výchozí hodnoty? Projeví se to až po uložení tlačítkem „Uložit nastavení".`)) return;
     state.settingsDraft[opt.key] = opt.getDefault();
     render();
+  });
+
+  app.querySelectorAll('[data-settings-toggle]').forEach(el => {
+    el.addEventListener('click', () => {
+      const key = el.getAttribute('data-settings-toggle');
+      if(!state.settingsCollapsed) state.settingsCollapsed = {};
+      state.settingsCollapsed[key] = !state.settingsCollapsed[key];
+      render();
+    });
+  });
+  app.querySelectorAll('[data-settings-csv]').forEach(el => {
+    el.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const field = el.getAttribute('data-settings-csv');
+      const label = el.getAttribute('data-settings-csv-label') || field;
+      const items = state.settingsDraft[field] || [];
+      downloadCsv(`${field}.csv`, [label], items.map(v => [v]));
+    });
   });
 
   app.querySelectorAll('[data-export-select]').forEach(el => {
