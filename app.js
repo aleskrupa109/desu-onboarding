@@ -107,6 +107,7 @@ const SETTINGS_RESET_OPTIONS = [
   { key:'vemaConstants', label:'Pevné hodnoty pro export do Vemy', getDefault: () => ({}) },
   { key:'systemUrls', label:'Adresy systémů', getDefault: () => ({...DEFAULT_SYSTEM_URLS}) },
   { key:'systemTypes', label:'Typy adres systémů (web/plocha)', getDefault: () => ({...DEFAULT_SYSTEM_TYPES}) },
+  { key:'hrRequiredOverrides', label:'Povinné položky personálního oddělení', getDefault: () => ({}) },
 ];
 
 function systemUrls(){ return (state.settings && state.settings.systemUrls) || DEFAULT_SYSTEM_URLS; }
@@ -278,6 +279,8 @@ const PERSONAL_SECTIONS = [
   ]},
 ];
 
+const HR_REQUIRABLE_FIELDS = PERSONAL_SECTIONS.filter(s => s.owner === 'hr' && s.type !== 'repeat').flatMap(sec => sec.fields.filter(f => f.essential || f.required).map(f => ({ sectionLabel: sec.label, fieldId: f.id, label: f.label })));
+
 const CHECKLIST_SECTIONS = [
   { id:'majetek', label:'Připravený majetek', owner:'admin', items:[
     {id:'notebook', label:'Notebook (kontrola VITA, OneDrive, e-mailu, jazyka)'},
@@ -426,7 +429,7 @@ const DEFAULT_INFO = {
   ],
 };
 
-let state = { view:'list', index:[], currentId:null, currentRecord:null, tab:'personal', loading:true, error:null, collapsed:{}, role:'hr', employeeMode:false, linkCopied:false, wizardStep:0, infoContent:null, editingInfo:false, previewingEmployee:false, returnMsgCopied:false, pendingEdit:null, filterText:'', colFilters:{pozice:'', pracoviste:'', personal:'', it:'', assigned:''}, sortKey:'created', sortDir:'desc', wizardStepError:false, editingWorkplace:null, editingFirstDayType:null, firstDayDismissPrompt:false, firstDayHiddenSession:false, settings:null, settingsDraft:null, settingsSaved:false, openItemNotes:{}, selectedExport:{}, exporting:false, hardRateLimited:false, selectedAssign:{}, bulkAssignTarget:'', bulkAssigning:false, saveStatus:null, saveStatusAt:null, standaloneMode:false, showMissingHighlights:false, userEmail:null, settingsCollapsed:{departments:true}, importQueue:[], importCurrent:null };
+let state = { view:'list', index:[], currentId:null, currentRecord:null, tab:'personal', loading:true, error:null, collapsed:{}, role:'hr', employeeMode:false, linkCopied:false, wizardStep:0, infoContent:null, editingInfo:false, previewingEmployee:false, returnMsgCopied:false, pendingEdit:null, filterText:'', colFilters:{pozice:'', pracoviste:'', personal:'', it:'', assigned:''}, sortKey:'created', sortDir:'desc', wizardStepError:false, editingWorkplace:null, editingFirstDayType:null, firstDayDismissPrompt:false, firstDayHiddenSession:false, settings:null, settingsDraft:null, settingsSaved:false, openItemNotes:{}, selectedExport:{}, exporting:false, hardRateLimited:false, selectedAssign:{}, bulkAssignTarget:'', bulkAssigning:false, saveStatus:null, saveStatusAt:null, standaloneMode:false, showMissingHighlights:false, userEmail:null, settingsCollapsed:{}, importQueue:[], importCurrent:null };
 
 function emptyPersonal(){
   const p = {};
@@ -551,7 +554,7 @@ async function saveRecord(id, record){
   }
 }
 async function loadSettings(){
-  const blank = () => ({ workplaces: [...DEFAULT_WORKPLACES], positions: [...DEFAULT_POSITIONS], admins: [...DEFAULT_ADMINS], supervisors: [...DEFAULT_SUPERVISORS], departments: [...DEFAULT_DEPARTMENTS], facilityStaff: [...DEFAULT_FACILITY_STAFF], offices: {...DEFAULT_OFFICES}, workplaceVemaCodes: {...DEFAULT_WORKPLACE_VEMA_CODES}, workplaceLocations: {...DEFAULT_WORKPLACE_LOCATIONS}, vemaConstants: {}, categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)), systemUrls: {...DEFAULT_SYSTEM_URLS}, systemTypes: {...DEFAULT_SYSTEM_TYPES} });
+  const blank = () => ({ workplaces: [...DEFAULT_WORKPLACES], positions: [...DEFAULT_POSITIONS], admins: [...DEFAULT_ADMINS], supervisors: [...DEFAULT_SUPERVISORS], departments: [...DEFAULT_DEPARTMENTS], facilityStaff: [...DEFAULT_FACILITY_STAFF], offices: {...DEFAULT_OFFICES}, workplaceVemaCodes: {...DEFAULT_WORKPLACE_VEMA_CODES}, workplaceLocations: {...DEFAULT_WORKPLACE_LOCATIONS}, vemaConstants: {}, categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)), systemUrls: {...DEFAULT_SYSTEM_URLS}, systemTypes: {...DEFAULT_SYSTEM_TYPES}, hrRequiredOverrides: {} });
   try{
     const res = await window.storage.get(STORAGE_SETTINGS_KEY, true);
     state.settings = res ? JSON.parse(res.value) : blank();
@@ -575,6 +578,7 @@ async function loadSettings(){
   if(!state.settings.systemUrls || typeof state.settings.systemUrls !== 'object') state.settings.systemUrls = {};
   SYSTEM_URL_KEYS.forEach(k => { if(!(k in state.settings.systemUrls)) state.settings.systemUrls[k] = ''; });
   if(!state.settings.systemTypes || typeof state.settings.systemTypes !== 'object') state.settings.systemTypes = {};
+  if(!state.settings.hrRequiredOverrides || typeof state.settings.hrRequiredOverrides !== 'object') state.settings.hrRequiredOverrides = {};
   SYSTEM_URL_KEYS.forEach(k => { if(!(k in state.settings.systemTypes)) state.settings.systemTypes[k] = 'web'; });
 }
 async function saveSettings(){
@@ -1576,9 +1580,12 @@ function downloadCsv(filename, headerCols, rows){
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
-function settingsPanelStart(key, title, csv){
+function isSettingsSectionCollapsed(key){
   if(!state.settingsCollapsed) state.settingsCollapsed = {};
-  const collapsed = !!state.settingsCollapsed[key];
+  return state.settingsCollapsed[key] !== false;
+}
+function settingsPanelStart(key, title, csv){
+  const collapsed = isSettingsSectionCollapsed(key);
   const csvBtn = csv ? `<button type="button" class="btn btn-ghost btn-sm settings-csv-btn" data-settings-csv="${esc(csv.field)}" data-settings-csv-label="${esc(csv.label)}">Export CSV</button>` : '';
   return `
     <div class="settings-panel-head" data-settings-toggle="${key}">
@@ -1789,6 +1796,27 @@ function renderSettingsPage(){
       ${settingsPanelEnd()}
     </div>
 
+    <div class="panel" style="margin-bottom:20px;">
+      ${settingsPanelStart('hrrequired', 'Povinné položky personálního oddělení')}
+      <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 12px;">Určuje, které údaje musí personální oddělení vyplnit, než půjde vygenerovat odkaz pro zaměstnance (a schválit údaje). Výchozí stav je „povinné" u všech — odškrtnutím položku z kontroly vyřadíte.</p>
+      ${(() => {
+        const bySection = {};
+        HR_REQUIRABLE_FIELDS.forEach(f => { (bySection[f.sectionLabel] = bySection[f.sectionLabel]||[]).push(f); });
+        return Object.entries(bySection).map(([sectionLabel, fields]) => `
+          <div style="margin-bottom:14px;">
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">${esc(sectionLabel)}</label>
+            ${fields.map(f => `
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0;cursor:pointer;">
+                <input type="checkbox" data-hrreq-toggle="${esc(f.fieldId)}" ${draft.hrRequiredOverrides[f.fieldId]===false?'':'checked'}>
+                ${esc(f.label)}
+              </label>
+            `).join('')}
+          </div>
+        `).join('');
+      })()}
+      ${settingsPanelEnd()}
+    </div>
+
     <button class="btn btn-primary" id="btn-save-settings">Uložit nastavení</button>
 
     <div class="panel" style="margin-top:28px;border-color:var(--red);">
@@ -1907,6 +1935,7 @@ function sectionHasHardError(sec, r){
 }
 
 function missingRequiredFields(record, includeHr){
+  const overrides = (state.settings && state.settings.hrRequiredOverrides) || {};
   const missing = [];
   PERSONAL_SECTIONS.forEach(sec => {
     if(sec.owner === 'hr' && !includeHr) return;
@@ -1916,6 +1945,7 @@ function missingRequiredFields(record, includeHr){
       rows.forEach((row, idx) => {
         sec.fields.forEach(f => {
           if(!f.essential && !f.required) return;
+          if(sec.owner === 'hr' && overrides[f.id] === false) return;
           if(f.showIf && !f.showIf(row)) return;
           const val = row[f.id];
           if(val == null || (typeof val === 'string' && val.trim() === '')){
@@ -1927,6 +1957,7 @@ function missingRequiredFields(record, includeHr){
     }
     sec.fields.forEach(f => {
       if(!f.essential && !f.required) return;
+      if(sec.owner === 'hr' && overrides[f.id] === false) return;
       if(f.showIf && !f.showIf(record.personal)) return;
       const val = record.personal[f.id];
       if(val == null || (typeof val === 'string' && val.trim() === '')){
@@ -1949,12 +1980,14 @@ function currentApproveMissing(){
 }
 
 function missingHrRequiredFields(record){
+  const overrides = (state.settings && state.settings.hrRequiredOverrides) || {};
   const missing = [];
   PERSONAL_SECTIONS.forEach(sec => {
     if(sec.owner !== 'hr') return;
     if(sec.type === 'repeat') return;
     sec.fields.forEach(f => {
       if(!f.essential && !f.required) return;
+      if(overrides[f.id] === false) return;
       if(f.showIf && !f.showIf(record.personal)) return;
       const val = record.personal[f.id];
       if(val == null || (typeof val === 'string' && val.trim() === '')){
@@ -2533,6 +2566,14 @@ function attachHandlers(){
   const deleteAllBtn = document.getElementById('btn-delete-all');
   if(deleteAllBtn) deleteAllBtn.addEventListener('click', openDeleteAllModal);
 
+  app.querySelectorAll('[data-hrreq-toggle]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const id = cb.getAttribute('data-hrreq-toggle');
+      if(cb.checked) delete state.settingsDraft.hrRequiredOverrides[id];
+      else state.settingsDraft.hrRequiredOverrides[id] = false;
+    });
+  });
+
   const settingsResetBtn = document.getElementById('btn-settings-reset');
   if(settingsResetBtn) settingsResetBtn.addEventListener('click', () => {
     const select = document.getElementById('settings-reset-select');
@@ -2546,8 +2587,7 @@ function attachHandlers(){
   app.querySelectorAll('[data-settings-toggle]').forEach(el => {
     el.addEventListener('click', () => {
       const key = el.getAttribute('data-settings-toggle');
-      if(!state.settingsCollapsed) state.settingsCollapsed = {};
-      state.settingsCollapsed[key] = !state.settingsCollapsed[key];
+      state.settingsCollapsed[key] = isSettingsSectionCollapsed(key) ? false : true;
       render();
     });
   });
