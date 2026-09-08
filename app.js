@@ -1198,6 +1198,7 @@ function renderList(){
         <tr>
           ${canCreate ? `<th style="width:28px;"><input type="checkbox" id="export-select-all" ${allReviewedSelected?'checked':''} ${reviewedRows.length===0?'disabled':''} title="Vybrat všechny zkontrolované"></th>` : ''}
           ${isAdmin ? `<th style="width:28px;"><input type="checkbox" id="assign-select-all" ${allAssignSelected?'checked':''} ${rows.length===0?'disabled':''} title="Vybrat všechny"></th>` : ''}
+          ${canCreate ? `<th style="width:28px;"></th>` : ''}
           <th data-sort="name">Zaměstnanec${sortArrow('name')}</th>
           <th data-sort="pozice">Pozice${sortArrow('pozice')}</th>
           <th data-sort="pracoviste">Pracoviště${sortArrow('pracoviste')}</th>
@@ -1210,6 +1211,7 @@ function renderList(){
         <tr class="index-filter-row">
           ${canCreate ? `<th></th>` : ''}
           ${isAdmin ? `<th></th>` : ''}
+          ${canCreate ? `<th></th>` : ''}
           <th></th>
           <th>${selectHtml('pozice', [['','Vše'], ...positionList().map(p=>[p,p])], cf.pozice)}</th>
           <th>${selectHtml('pracoviste', [['','Vše'], ...workplaceList().map(w=>[w,w])], cf.pracoviste)}</th>
@@ -1227,7 +1229,8 @@ function renderList(){
             <tr class="index-row" data-open="${r.id}">
               ${canCreate ? `<td><input type="checkbox" data-export-select="${r.id}" ${state.selectedExport[r.id]?'checked':''} ${isReviewed?'':'disabled'}></td>` : ''}
               ${isAdmin ? `<td><input type="checkbox" data-assign-select="${r.id}" ${state.selectedAssign[r.id]?'checked':''}></td>` : ''}
-              <td><div class="index-name">${esc(r.jmeno)} ${esc(r.prijmeni)} ${canCreate ? `<button class="btn-quickedit-icon" data-quickedit="${r.id}" title="Rychle doplnit základní údaje">✎</button>` : ''}</div><div class="index-ref">${esc(r.ref)}</div></td>
+              ${canCreate ? `<td style="text-align:center;"><button class="btn-quickedit-icon" data-quickedit="${r.id}" title="Rychle doplnit základní údaje">✎</button></td>` : ''}
+              <td><div class="index-name">${esc(r.jmeno)} ${esc(r.prijmeni)}</div><div class="index-ref">${esc(r.ref)}</div></td>
               <td>${esc(r.pozice || '—')}</td>
               <td>${esc(r.pracoviste || '—')}</td>
               <td>${esc(formatDate(r.datumNastupu)) || '—'}</td>
