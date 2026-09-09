@@ -2029,6 +2029,9 @@ function renderHrStatusPanel(r){
   let html = `<div class="review-row ${status==='reviewed'?'done':''}">
     <span>Stav: <strong>${esc(statusLabel)}</strong></span>
   </div>`;
+  html += `<div class="review-row" style="margin-top:-6px;">
+    <span style="font-size:12.5px;color:var(--ink-faint);">Souhlas se zpracováním osobních údajů: ${r.consentGiven ? `<strong style="color:var(--ink-soft);">uděleno</strong> ${esc(new Date(r.consentAt).toLocaleString('cs-CZ',{dateStyle:'short',timeStyle:'short'}))}` : '<strong style="color:var(--red);">zatím neuděleno</strong>'}</span>
+  </div>`;
   html += `<div class="hr-status-actions">`;
   if(status === 'submitted' || status === 'returned'){
     html += `<button class="btn btn-primary btn-sm" id="btn-approve">Schválit údaje</button>`;
@@ -4188,6 +4191,32 @@ function openWithdrawModal(){
   });
 }
 
+function openLeaveConfirmModal(){
+  if(document.getElementById('leave-confirm-modal')) return;
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'leave-confirm-modal';
+  backdrop.innerHTML = `
+    <div class="modal">
+      <h3>Opustit aplikaci?</h3>
+      <p style="font-size:13.5px;color:var(--ink-soft);">Chystáte se opustit aplikaci tlačítkem zpět v prohlížeči.</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="leave-stay">Zůstat v aplikaci</button>
+        <button class="btn btn-danger" id="leave-confirm">Opustit aplikaci</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  document.getElementById('leave-stay').addEventListener('click', () => {
+    backdrop.remove();
+    history.pushState(null, '', location.href);
+  });
+  document.getElementById('leave-confirm').addEventListener('click', () => {
+    backdrop.remove();
+    history.back();
+  });
+}
+
 function openDeleteModal(id){
   const entry = state.index.find(e => e.id === id);
   if(!entry) return;
@@ -4316,6 +4345,12 @@ async function openDetail(id){
   window.addEventListener('beforeunload', (e) => {
     e.preventDefault();
     e.returnValue = '';
+  });
+  // Safari nespouští beforeunload spolehlivě při navigaci tlačítkem zpět/vpřed v rámci appky
+  // (bfcache) — proto appka navíc nastraží krok v historii a zachytává to přes popstate.
+  history.pushState(null, '', location.href);
+  window.addEventListener('popstate', () => {
+    openLeaveConfirmModal();
   });
   state.standaloneMode = false;
   await loadSettings();
