@@ -1157,6 +1157,7 @@ function renderList(){
       <h2>Rejstřík nástupů</h2>
       <div style="display:flex;gap:8px;">
         ${canCreate ? `<button class="btn btn-ghost" id="btn-import-upload">Vytěžit podklady</button><input type="file" id="import-file-input" accept=".xlsx,.xls" multiple style="display:none;">` : ''}
+        ${canCreate ? `<button class="btn btn-ghost" id="btn-recompute-statuses" title="Přenačte u všech nedokončených spisů, kolik povinných údajů personálního ještě chybí">Přepočítat stavy</button>` : ''}
         ${canCreate ? `<button class="btn btn-primary" id="btn-new">+ Nový nástup</button>` : ''}
       </div>
     </div>
@@ -2671,6 +2672,20 @@ function attachHandlers(){
     render();
   });
 
+  const recomputeBtn = document.getElementById('btn-recompute-statuses');
+  if(recomputeBtn) recomputeBtn.addEventListener('click', async () => {
+    recomputeBtn.disabled = true;
+    recomputeBtn.textContent = 'Přepočítávám…';
+    try{
+      const fixed = await recomputeAllStatuses();
+      state.error = fixed > 0 ? `Hotovo — opraveno ${fixed} spisů.` : 'Hotovo — žádné rozdíly se nenašly, vše bylo v pořádku.';
+    }catch(e){
+      console.error('recomputeAllStatuses failed:', e);
+      state.error = 'Přepočet se nezdařil, zkuste to prosím znovu.';
+    }
+    render();
+  });
+
   const importUploadBtn = document.getElementById('btn-import-upload');
   if(importUploadBtn) importUploadBtn.addEventListener('click', () => {
     document.getElementById('import-file-input').click();
@@ -3600,6 +3615,23 @@ async function readXlsxFile(file){
     rows.push(rowVals);
   }
   return { headers, rows };
+}
+
+async function recomputeAllStatuses(){
+  let fixed = 0;
+  for(const entry of state.index){
+    if((entry.personalStatus || 'draft') !== 'draft') continue;
+    try{
+      const record = await loadRecord(entry.id);
+      const newCount = missingHrRequiredFields(record).length;
+      const newLink = record.linkGeneratedAt || null;
+      if(entry.hrMissingCount !== newCount || entry.linkGeneratedAt !== newLink) fixed++;
+      entry.hrMissingCount = newCount;
+      entry.linkGeneratedAt = newLink;
+    }catch(e){ console.error('recompute failed for', entry.id, e); }
+  }
+  await saveIndex();
+  return fixed;
 }
 
 async function runImportBatch(){
