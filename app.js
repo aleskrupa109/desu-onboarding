@@ -1252,12 +1252,18 @@ function chip(done, label){
   if(done) return `<span class="chip chip-done"><i>✓</i> ${label || 'Hotovo'}</span>`;
   return `<span class="chip chip-progress-bg">${label || 'Nevyplněno'}</span>`;
 }
+function draftStageInfo(missingCount, linkGeneratedAt){
+  if(missingCount > 0) return { label:'K doplnění personálním oddělením', chipClass:'chip-amber' };
+  if(!linkGeneratedAt) return { label:'Připraveno — vygenerujte odkaz pro zaměstnance', chipClass:'chip-blue' };
+  return { label:'Čeká na zaměstnance', chipClass:'chip-progress-bg' };
+}
 function personalChip(r){
   const status = r.personalStatus || 'draft';
   if(status === 'reviewed') return `<span class="chip chip-done">Zkontrolováno</span>`;
   if(status === 'returned') return `<span class="chip chip-amber">Vráceno k doplnění</span>`;
   if(status === 'submitted') return `<span class="chip chip-blue">Odesláno zaměstnancem</span>`;
-  return `<span class="chip chip-progress-bg">Čeká na zaměstnance</span>`;
+  const info = draftStageInfo(r.hrMissingCount || 0, r.linkGeneratedAt);
+  return `<span class="chip ${info.chipClass}">${esc(info.label)}</span>`;
 }
 
 function availableTabs(){
@@ -2005,8 +2011,7 @@ const STATUS_LABEL = { draft:'Zaměstnanec ještě nevyplnil / neodeslal', submi
 
 function renderHrStatusPanel(r){
   const status = r.personalStatus || 'draft';
-  const hrMissingForLabel = status === 'draft' ? missingHrRequiredFields(r) : [];
-  const statusLabel = hrMissingForLabel.length > 0 ? 'K doplnění personálním oddělením' : STATUS_LABEL[status];
+  const statusLabel = status === 'draft' ? draftStageInfo(missingHrRequiredFields(r).length, r.linkGeneratedAt).label : STATUS_LABEL[status];
   const flagCount = Object.keys(r.fieldFlags||{}).length;
   let html = `<div class="review-row ${status==='reviewed'?'done':''}">
     <span>Stav: <strong>${esc(statusLabel)}</strong></span>
@@ -2833,6 +2838,10 @@ function attachHandlers(){
     const url = location.href.split('#')[0] + '#z/' + state.currentId;
     try{ await navigator.clipboard.writeText(url); }catch(e){}
     state.linkCopied = true;
+    if(!state.currentRecord.linkGeneratedAt){
+      state.currentRecord.linkGeneratedAt = new Date().toISOString();
+      persistCurrentRecord();
+    }
     render();
     setTimeout(() => { state.linkCopied = false; }, 3000);
   });
@@ -3329,6 +3338,12 @@ function attachHandlers(){
 
 async function persistRecordOnly(){
   const ok = await saveRecord(state.currentId, state.currentRecord);
+  const entry = state.index.find(e => e.id === state.currentId);
+  if(entry){
+    entry.hrMissingCount = missingHrRequiredFields(state.currentRecord).length;
+    entry.linkGeneratedAt = state.currentRecord.linkGeneratedAt || null;
+    await saveIndex();
+  }
   if(ok){
     state.saveStatus = 'saved';
     state.saveStatusAt = Date.now();
@@ -3402,6 +3417,8 @@ async function persistCurrentRecord(){
     entry.datumNastupu = state.currentRecord.personal.datum_nastupu || entry.datumNastupu;
     entry.personalStatus = state.currentRecord.personalStatus;
     entry.assignedAdmin = state.currentRecord.assignedAdmin;
+    entry.hrMissingCount = missingHrRequiredFields(state.currentRecord).length;
+    entry.linkGeneratedAt = state.currentRecord.linkGeneratedAt || null;
     const {total, done} = checklistTotals(state.currentRecord.checklist, state.currentRecord.personal.kategorie, 'it');
     entry.itTotal = total;
     entry.itDone = done;
@@ -3594,7 +3611,7 @@ async function runImportBatch(){
     const id = 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2,8) + i;
     seqBase += 1;
     const ref = `OB-${year}-${String(seqBase).padStart(4,'0')}`;
-    const record = { personal: emptyPersonal(), checklist: emptyChecklist(), personalStatus:'draft', fieldFlags:{}, returnNote:'', assignedAdmin:'', assignedOffice:'', assignedFacilityStaff:'', firstDayDismissed:false, consentGiven:false, consentAt:null };
+    const record = { personal: emptyPersonal(), checklist: emptyChecklist(), personalStatus:'draft', fieldFlags:{}, returnNote:'', assignedAdmin:'', assignedOffice:'', assignedFacilityStaff:'', firstDayDismissed:false, consentGiven:false, consentAt:null, linkGeneratedAt:null };
     Object.entries(cur.common || {}).forEach(([key, val]) => {
       if(val) record.personal[key] = val;
     });
@@ -3609,7 +3626,7 @@ async function runImportBatch(){
     const {total, done} = checklistTotals(record.checklist, record.personal.kategorie, 'it');
     batch.push({
       id, record,
-      entry: { id, ref, jmeno: record.personal.jmeno||'', prijmeni: record.personal.prijmeni||'', pozice: record.personal.pozice||'', pracoviste: record.personal.pracoviste||'', datumNastupu: record.personal.datum_nastupu||'', created: Date.now()+i, personalStatus:'draft', itTotal: total, itDone: done }
+      entry: { id, ref, jmeno: record.personal.jmeno||'', prijmeni: record.personal.prijmeni||'', pozice: record.personal.pozice||'', pracoviste: record.personal.pracoviste||'', datumNastupu: record.personal.datum_nastupu||'', created: Date.now()+i, personalStatus:'draft', itTotal: total, itDone: done, hrMissingCount: missingHrRequiredFields(record).length, linkGeneratedAt: null }
     });
   });
   let saved = 0;
@@ -3983,7 +4000,7 @@ function openNewModal(){
     const year = new Date().getFullYear();
     const seq = (state.index.filter(e => e.ref && e.ref.startsWith('OB-'+year)).length + 1).toString().padStart(4,'0');
     const ref = `OB-${year}-${seq}`;
-    const record = { personal: emptyPersonal(), checklist: emptyChecklist(), personalStatus:'draft', fieldFlags:{}, returnNote:'', assignedAdmin:'', assignedOffice:'', assignedFacilityStaff:'', firstDayDismissed:false, consentGiven:false, consentAt:null };
+    const record = { personal: emptyPersonal(), checklist: emptyChecklist(), personalStatus:'draft', fieldFlags:{}, returnNote:'', assignedAdmin:'', assignedOffice:'', assignedFacilityStaff:'', firstDayDismissed:false, consentGiven:false, consentAt:null, linkGeneratedAt:null };
     record.personal.jmeno = jmeno;
     record.personal.prijmeni = prijmeni;
     record.personal.pozice = pozice;
@@ -3996,7 +4013,7 @@ function openNewModal(){
     record.personal.datum_nastupu = datum;
     ensureSuggestedEmail(record);
     const {total, done} = checklistTotals(record.checklist, kategorie, 'it');
-    state.index.push({ id, ref, jmeno, prijmeni, pozice, pracoviste, datumNastupu: datum, created: Date.now(), personalStatus:'draft', itTotal: total, itDone: done });
+    state.index.push({ id, ref, jmeno, prijmeni, pozice, pracoviste, datumNastupu: datum, created: Date.now(), personalStatus:'draft', itTotal: total, itDone: done, hrMissingCount: missingHrRequiredFields(record).length, linkGeneratedAt: null });
     await saveIndex();
     await saveRecord(id, record);
     backdrop.remove();
@@ -4075,6 +4092,7 @@ async function openQuickEditModal(id){
     idxEntry.pozice = p.pozice;
     idxEntry.pracoviste = p.pracoviste;
     idxEntry.datumNastupu = p.datum_nastupu;
+    idxEntry.hrMissingCount = missingHrRequiredFields(record).length;
     await saveRecord(id, record);
     await saveIndex();
     backdrop.remove();
