@@ -279,7 +279,8 @@ const PERSONAL_SECTIONS = [
   ]},
 ];
 
-const HR_REQUIRABLE_FIELDS = PERSONAL_SECTIONS.filter(s => s.owner === 'hr' && s.type !== 'repeat').flatMap(sec => sec.fields.filter(f => f.essential || f.required).map(f => ({ sectionLabel: sec.label, fieldId: f.id, label: f.label })));
+const KROK1_HR_FIELD_IDS = ['pozice','pracoviste','typ_nastupu','kategorie','nadrizeny','rezim_zamestnani','rozsah_uvazku','datum_nastupu'];
+const HR_REQUIRABLE_FIELDS = PERSONAL_SECTIONS.filter(s => s.owner === 'hr' && s.type !== 'repeat').flatMap(sec => sec.fields.filter(f => f.essential || f.required).map(f => ({ sectionLabel: sec.label, fieldId: f.id, label: f.label, stage: KROK1_HR_FIELD_IDS.includes(f.id) ? 'krok1' : 'zbytek' })));
 
 const CHECKLIST_SECTIONS = [
   { id:'majetek', label:'Připravený majetek', owner:'admin', items:[
@@ -1157,7 +1158,6 @@ function renderList(){
       <h2>Rejstřík nástupů</h2>
       <div style="display:flex;gap:8px;">
         ${canCreate ? `<button class="btn btn-ghost" id="btn-import-upload">Vytěžit podklady</button><input type="file" id="import-file-input" accept=".xlsx,.xls" multiple style="display:none;">` : ''}
-        ${canCreate ? `<button class="btn btn-ghost" id="btn-recompute-statuses" title="Přenačte u všech nedokončených spisů, kolik povinných údajů personálního ještě chybí">Přepočítat stavy</button>` : ''}
         ${canCreate ? `<button class="btn btn-primary" id="btn-new">+ Nový nástup</button>` : ''}
       </div>
     </div>
@@ -1808,21 +1808,27 @@ function renderSettingsPage(){
 
     <div class="panel" style="margin-bottom:20px;">
       ${settingsPanelStart('hrrequired', 'Povinné položky personálního oddělení')}
-      <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 12px;">Určuje, které údaje musí personální oddělení vyplnit, než půjde vygenerovat odkaz pro zaměstnance (a schválit údaje). Výchozí stav je „povinné" u všech — odškrtnutím položku z kontroly vyřadíte.</p>
+      <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 12px;">Výchozí stav je „povinné" u všech — odškrtnutím položku z kontroly vyřadíte.</p>
       ${(() => {
-        const bySection = {};
-        HR_REQUIRABLE_FIELDS.forEach(f => { (bySection[f.sectionLabel] = bySection[f.sectionLabel]||[]).push(f); });
-        return Object.entries(bySection).map(([sectionLabel, fields]) => `
-          <div style="margin-bottom:14px;">
-            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">${esc(sectionLabel)}</label>
-            ${fields.map(f => `
-              <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0;cursor:pointer;">
-                <input type="checkbox" data-hrreq-toggle="${esc(f.fieldId)}" ${draft.hrRequiredOverrides[f.fieldId]===false?'':'checked'}>
-                ${esc(f.label)}
-              </label>
-            `).join('')}
-          </div>
-        `).join('');
+        const groups = [
+          { key:'krok1', title:'Krok 1 — podmínka pro vygenerování odkazu zaměstnanci', note:'Stejný seznam jako v modálu „Nový nástup" / „Rychlé doplnění" (bez jména a příjmení, ta se hlídají už při založení spisu).' },
+          { key:'zbytek', title:'Zbývající údaje — podmínka pro schválení a export do Vemy', note:'Můžou se doplnit později, klidně až po odeslání odkazu zaměstnanci.' },
+        ];
+        return groups.map(g => {
+          const fields = HR_REQUIRABLE_FIELDS.filter(f => f.stage === g.key);
+          return `
+            <div style="margin-bottom:18px;">
+              <label style="font-size:13.5px;font-weight:600;display:block;margin-bottom:2px;">${esc(g.title)}</label>
+              <p style="font-size:11.5px;color:var(--ink-faint);margin:0 0 8px;">${esc(g.note)}</p>
+              ${fields.map(f => `
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0;cursor:pointer;">
+                  <input type="checkbox" data-hrreq-toggle="${esc(f.fieldId)}" ${draft.hrRequiredOverrides[f.fieldId]===false?'':'checked'}>
+                  ${esc(f.label)}
+                </label>
+              `).join('')}
+            </div>
+          `;
+        }).join('');
       })()}
       ${settingsPanelEnd()}
     </div>
@@ -1989,6 +1995,8 @@ function currentApproveMissing(){
   return missingRequiredFields(state.currentRecord, true);
 }
 
+// Krok 1 — základní údaje ze stejného seznamu jako modál "Nový nástup"/"Rychlé doplnění".
+// Bez těchto (+ jména a příjmení, která se hlídají už při založení spisu) nejde vygenerovat odkaz pro zaměstnance.
 function missingHrRequiredFields(record){
   const overrides = (state.settings && state.settings.hrRequiredOverrides) || {};
   const missing = [];
@@ -1996,6 +2004,7 @@ function missingHrRequiredFields(record){
     if(sec.owner !== 'hr') return;
     if(sec.type === 'repeat') return;
     sec.fields.forEach(f => {
+      if(!KROK1_HR_FIELD_IDS.includes(f.id)) return;
       if(!f.essential && !f.required) return;
       if(overrides[f.id] === false) return;
       if(f.showIf && !f.showIf(record.personal)) return;
@@ -2669,20 +2678,6 @@ function attachHandlers(){
     }
     state.exporting = false;
     state.selectedExport = {};
-    render();
-  });
-
-  const recomputeBtn = document.getElementById('btn-recompute-statuses');
-  if(recomputeBtn) recomputeBtn.addEventListener('click', async () => {
-    recomputeBtn.disabled = true;
-    recomputeBtn.textContent = 'Přepočítávám…';
-    try{
-      const fixed = await recomputeAllStatuses();
-      state.error = fixed > 0 ? `Hotovo — opraveno ${fixed} spisů.` : 'Hotovo — žádné rozdíly se nenašly, vše bylo v pořádku.';
-    }catch(e){
-      console.error('recomputeAllStatuses failed:', e);
-      state.error = 'Přepočet se nezdařil, zkuste to prosím znovu.';
-    }
     render();
   });
 
@@ -3615,23 +3610,6 @@ async function readXlsxFile(file){
     rows.push(rowVals);
   }
   return { headers, rows };
-}
-
-async function recomputeAllStatuses(){
-  let fixed = 0;
-  for(const entry of state.index){
-    if((entry.personalStatus || 'draft') !== 'draft') continue;
-    try{
-      const record = await loadRecord(entry.id);
-      const newCount = missingHrRequiredFields(record).length;
-      const newLink = record.linkGeneratedAt || null;
-      if(entry.hrMissingCount !== newCount || entry.linkGeneratedAt !== newLink) fixed++;
-      entry.hrMissingCount = newCount;
-      entry.linkGeneratedAt = newLink;
-    }catch(e){ console.error('recompute failed for', entry.id, e); }
-  }
-  await saveIndex();
-  return fixed;
 }
 
 async function runImportBatch(){
