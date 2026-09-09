@@ -1061,7 +1061,7 @@ function render(){
       </div>
     </div>
     <div class="no-print">
-    ${state.employeeMode ? `<div class="employee-banner">Toto je váš osobní onboardingový prostor. Vyplněné údaje uvidí personální oddělení, které je zkontroluje a případně doplní.</div>` : state.previewingEmployee ? `<div class="employee-banner">Náhled toho, co uvidí zaměstnanec. <button class="btn btn-ghost btn-sm" id="btn-exit-preview" style="margin-left:10px;">Ukončit náhled</button></div>` : renderRoleSwitch()}
+    ${state.employeeMode ? `<div class="employee-banner">Toto je váš osobní onboardingový prostor. Vyplněné údaje uvidí personální oddělení, které je zkontroluje a případně doplní.</div>` : renderRoleSwitch()}
     ${state.error ? `<div style="background:var(--red-tint);color:var(--red);padding:10px 14px;border-radius:3px;margin-bottom:16px;font-size:13px;">${esc(state.error)}</div>` : ''}
     </div>
     ${state.view === 'list' ? renderList() : state.view === 'info-admin' ? renderInfoAdminPage() : state.view === 'settings' ? renderSettingsPage() : state.view === 'print-docs' ? renderPrintDocsPage() : state.view === 'import-mapping' ? renderImportMappingPage() : renderDetail()}
@@ -1325,7 +1325,7 @@ function renderDetail(){
         ${state.role==='hr' && !state.previewingEmployee ? (() => {
           const hrMissing = missingHrRequiredFields(r);
           const linkReady = hrMissing.length === 0;
-          return `<button class="btn btn-ghost btn-sm" id="btn-preview-employee">Náhled jako zaměstnanec</button><button class="btn btn-ghost btn-sm" id="btn-copy-link" ${linkReady?'':'disabled title="Nejdřív doplňte povinné údaje personálního oddělení (viz Osobní údaje)"'}>${state.linkCopied ? 'Odkaz zkopírován ✓' : 'Zkopírovat odkaz pro zaměstnance'}</button>`;
+          return `<button class="btn btn-ghost btn-sm" id="btn-copy-link" ${linkReady?'':'disabled title="Nejdřív doplňte povinné údaje personálního oddělení (viz Osobní údaje)"'}>${state.linkCopied ? 'Odkaz zkopírován ✓' : 'Zkopírovat odkaz pro zaměstnance'}</button>`;
         })() : ''}
       </div>
     </div>
@@ -2830,22 +2830,6 @@ function attachHandlers(){
     render();
   });
 
-  const previewBtn = document.getElementById('btn-preview-employee');
-  if(previewBtn) previewBtn.addEventListener('click', () => {
-    state.previewingEmployee = true;
-    state.role = 'employee';
-    state.tab = availableTabs()[0];
-    state.wizardStep = 0; state.wizardStepError = false;
-    render();
-  });
-  const exitPreviewBtn = document.getElementById('btn-exit-preview');
-  if(exitPreviewBtn) exitPreviewBtn.addEventListener('click', () => {
-    state.previewingEmployee = false;
-    state.role = 'hr';
-    state.tab = 'personal';
-    render();
-  });
-
   const copyBtn = document.getElementById('btn-copy-link');
   if(copyBtn) copyBtn.addEventListener('click', async () => {
     const url = location.href.split('#')[0] + '#z/' + state.currentId;
@@ -4329,6 +4313,10 @@ async function openDetail(id){
   }
 
   async function startApp(){
+  window.addEventListener('beforeunload', (e) => {
+    e.preventDefault();
+    e.returnValue = '';
+  });
   state.standaloneMode = false;
   await loadSettings();
   await loadIndex();
