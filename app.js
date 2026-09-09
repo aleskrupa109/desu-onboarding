@@ -1275,8 +1275,11 @@ function availableTabs(){
 
 function renderDetail(){
   const r = state.currentRecord;
+  if(!r) return `<p>Záznam nenalezen.</p>`;
   const idxEntry = state.index.find(e => e.id === state.currentId);
-  if(!r || !idxEntry) return `<p>Záznam nenalezen.</p>`;
+  const displayName = `${r.personal.jmeno||''} ${r.personal.prijmeni||''}`.trim();
+  const displayRef = idxEntry ? idxEntry.ref : '';
+  const displayDatumNastupu = idxEntry ? idxEntry.datumNastupu : r.personal.datum_nastupu;
   const itTotals = checklistTotals(r.checklist, r.personal.kategorie, 'it');
   const provozTotals = checklistTotals(r.checklist, r.personal.kategorie, 'provoz');
   const itPct = itTotals.total ? Math.round(itTotals.done/itTotals.total*100) : 0;
@@ -1290,8 +1293,8 @@ function renderDetail(){
       ${state.employeeMode || state.previewingEmployee ? '' : `<div class="back-link" id="btn-back">← Zpět na rejstřík</div>`}
       <div class="detail-head">
         <div>
-          <h2 class="detail-title">${esc(idxEntry.jmeno)} ${esc(idxEntry.prijmeni)}</h2>
-          <div class="detail-sub">${esc(idxEntry.ref)}</div>
+          <h2 class="detail-title">${esc(displayName)}</h2>
+          <div class="detail-sub">${esc(displayRef)}</div>
         </div>
       </div>
       <div class="panel">
@@ -1314,8 +1317,8 @@ function renderDetail(){
     ${state.employeeMode || state.previewingEmployee ? '' : `<div class="back-link" id="btn-back">← Zpět na rejstřík</div>`}
     <div class="detail-head">
       <div>
-        <h2 class="detail-title">${esc(idxEntry.jmeno)} ${esc(idxEntry.prijmeni)}</h2>
-        <div class="detail-sub">${esc(idxEntry.ref)} · nástup ${esc(formatDate(idxEntry.datumNastupu)) || '—'}</div>
+        <h2 class="detail-title">${esc(displayName)}</h2>
+        <div class="detail-sub">${esc(displayRef)}${displayRef?' · ':''}nástup ${esc(formatDate(displayDatumNastupu)) || '—'}</div>
       </div>
       <div class="detail-actions">
         ${complete ? `<div class="stamp">Přístupy vyřízeny</div>` : ''}
