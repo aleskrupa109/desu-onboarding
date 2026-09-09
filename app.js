@@ -4333,12 +4333,20 @@ async function openDetail(id){
   state.loading = false;
   if(isEmployeeLink){
     const id = hash.slice(3);
-    if(state.index.find(e => e.id === id)){
-      state.employeeMode = true;
-      state.role = 'employee';
+    state.employeeMode = true;
+    state.role = 'employee';
+    try{
+      await window.storage.get(recordKey(id), true);
       await openDetail(id);
-      return;
+    }catch(e){
+      console.error('employee link failed to load record:', e);
+      state.loading = false;
+      document.getElementById('app').innerHTML = `<div style="max-width:480px;margin:80px auto;text-align:center;font-family:var(--font-body);">
+        <h2 style="font-family:var(--font-display);">Odkaz nebyl nalezen</h2>
+        <p style="color:var(--ink-faint);font-size:13px;">Zkontrolujte prosím, že jste odkaz zkopíroval/a celý. Pokud problém trvá, kontaktujte personální oddělení.</p>
+      </div>`;
     }
+    return;
   }
   render();
   }
