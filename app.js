@@ -1157,7 +1157,7 @@ function renderList(){
     <div class="index-toolbar">
       <h2>Rejstřík nástupů</h2>
       <div style="display:flex;gap:8px;">
-        ${canCreate ? `<button class="btn btn-ghost" id="btn-import-upload">Vytěžit podklady</button><input type="file" id="import-file-input" accept=".xlsx,.xls" multiple style="display:none;">` : ''}
+        ${canCreate ? `<button class="btn btn-ghost" id="btn-import-upload">Vytěžit podklady</button><input type="file" id="import-file-input" accept=".xlsx,.xls,.json" multiple style="display:none;">` : ''}
         ${canCreate ? `<button class="btn btn-primary" id="btn-new">+ Nový nástup</button>` : ''}
       </div>
     </div>
@@ -2201,6 +2201,7 @@ function renderImportMappingPage(){
     <h2 style="font-family:var(--font-display);font-size:1.4rem;margin:0 0 6px;">Vytěžení podkladů — ${esc(cur.fileName)}</h2>
     <p style="font-size:13px;color:var(--ink-soft);margin:0 0 16px;">Nalezeno ${cur.rows.length} řádků. Zkontrolujte prosím u každého sloupce, na jaký údaj se má namapovat — appka to zkusila odhadnout sama, ale stojí za to to zkontrolovat, hlavně u sloupců, které nešly jednoznačně rozpoznat.</p>
 
+    ${cur.groupColIdx == null ? `
     <div class="panel" style="margin-bottom:16px;">
       <h4 style="font-family:var(--font-display);font-size:1.125rem;margin:0 0 4px;">Společné hodnoty pro celý soubor</h4>
       <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 12px;">Nepovinné. Tabulky bývají za jednotlivá pracoviště, takže třeba pracoviště nebo datum nástupu bude stejné pro všechny řádky — vyplňte to tady místo v tabulce sloupec po sloupci. Pokud níže zároveň namapujete i sloupec z tabulky pro stejný údaj, hodnota ze sloupce má přednost.</p>
@@ -2216,6 +2217,36 @@ function renderImportMappingPage(){
         `).join('')}
       </div>
     </div>
+    ` : (() => {
+      const groupCounts = {};
+      cur.rows.forEach(row => { const g = row[cur.groupColIdx] || '(bez původu)'; groupCounts[g] = (groupCounts[g]||0)+1; });
+      const groups = Object.keys(groupCounts).sort();
+      return `
+      <div class="panel" style="margin-bottom:16px;">
+        ${settingsPanelStart('import-group-common', 'Společné hodnoty podle původu')}
+        <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 14px;">Nepovinné. Soubor obsahuje lidi z více původních útvarů/úřadů — u každého jde nastavit vlastní společné hodnoty (např. typ nástupu se může lišit podle toho, odkud kdo přechází). Pokud níže zároveň namapujete i sloupec z tabulky pro stejný údaj, hodnota ze sloupce má přednost.</p>
+        ${groups.map(g => `
+          <div style="margin-bottom:18px;border-top:1px solid var(--line);padding-top:12px;">
+            <label style="font-size:13.5px;font-weight:600;display:block;margin-bottom:8px;">${esc(g)} <span style="font-weight:400;color:var(--ink-faint);">(${groupCounts[g]} ${groupCounts[g]===1?'osoba':groupCounts[g]<5?'osoby':'osob'})</span></label>
+            <div class="form-grid">
+              ${IMPORT_COMMON_FIELDS.map(f => {
+                const val = (cur.groupCommon[g] && cur.groupCommon[g][f.key]) || '';
+                return `
+                <div class="field">
+                  <label>${esc(f.label)}</label>
+                  ${f.type === 'select'
+                    ? `<select data-import-group-common="${esc(g)}:${f.key}">${f.options().map(o => `<option value="${esc(o)}" ${val===o?'selected':''}>${esc(o || '— nevyplněno —')}</option>`).join('')}</select>`
+                    : `<input type="date" data-import-group-common="${esc(g)}:${f.key}" value="${esc(val)}">`
+                  }
+                </div>
+              `;}).join('')}
+            </div>
+          </div>
+        `).join('')}
+        ${settingsPanelEnd()}
+      </div>
+      `;
+    })()}
 
     <div class="panel" style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -2699,16 +2730,17 @@ function attachHandlers(){
     const queue = [];
     for(const file of files){
       try{
-        const { headers, rows } = await readXlsxFile(file);
+        const isJson = /\.json$/i.test(file.name);
+        const { headers, rows, mapping: presetMapping, groupColIdx } = isJson ? await readJsonOrgFile(file) : await readXlsxFile(file);
         if(headers.length === 0 || rows.length === 0){
-          state.error = `Soubor „${file.name}" neobsahuje žádná data k vytěžení (očekává se hlavička v prvním řádku).`;
+          state.error = `Soubor „${file.name}" neobsahuje žádná data k vytěžení${isJson ? ' (po vyřazení současných zaměstnanců DESÚ nezbyl nikdo k založení)' : ' (očekává se hlavička v prvním řádku)'}.`;
           continue;
         }
-        const mapping = {};
-        headers.forEach((h,i) => { mapping[i] = guessFieldTarget(h); });
-        queue.push({ fileName: file.name, headers, rows, mapping, common:{} });
+        const mapping = presetMapping || {};
+        if(!presetMapping) headers.forEach((h,i) => { mapping[i] = guessFieldTarget(h); });
+        queue.push({ fileName: file.name, headers, rows, mapping, common:{}, groupColIdx: groupColIdx==null?null:groupColIdx, groupCommon:{} });
       }catch(err){
-        console.error('readXlsxFile failed:', err);
+        console.error('file read failed:', err);
         state.error = `Nepodařilo se přečíst soubor „${file.name}": ${err.message}`;
       }
     }
@@ -2723,6 +2755,16 @@ function attachHandlers(){
   app.querySelectorAll('[data-import-common]').forEach(el => {
     el.addEventListener('change', () => {
       state.importCurrent.common[el.getAttribute('data-import-common')] = el.value;
+    });
+  });
+  app.querySelectorAll('[data-import-group-common]').forEach(el => {
+    el.addEventListener('change', () => {
+      const raw = el.getAttribute('data-import-group-common');
+      const sep = raw.indexOf(':');
+      const group = raw.slice(0, sep);
+      const field = raw.slice(sep+1);
+      if(!state.importCurrent.groupCommon[group]) state.importCurrent.groupCommon[group] = {};
+      state.importCurrent.groupCommon[group][field] = el.value;
     });
   });
   app.querySelectorAll('[data-import-map]').forEach(sel => {
@@ -3522,6 +3564,7 @@ const IMPORT_FIELD_TARGETS = [
   { key:'telefon_soukromy', label:'Telefon (soukromý)', apply:(r,v) => { r.personal.telefon_soukromy = String(v||'').trim(); } },
   { key:'osobni_cislo', label:'Osobní číslo', apply:(r,v) => { r.personal.osobni_cislo = String(v||'').trim(); } },
   { key:'odbor_oddeleni', label:'Odbor / oddělení', apply:(r,v) => { r.personal.odbor_oddeleni = String(v||'').trim(); } },
+  { key:'pracoviste', label:'Pracoviště', apply:(r,v) => { r.personal.pracoviste = String(v||'').trim(); } },
   { key:'pozice', label:'Pracovní pozice', apply:(r,v) => { r.personal.pozice = String(v||'').trim(); } },
   { key:'rezim_zamestnani', label:'Typ úvazku (PP/SP → Pracovní/Služební poměr)', apply:(r,v) => {
       const t = String(v||'').trim().toUpperCase();
@@ -3573,6 +3616,59 @@ function guessFieldTarget(header){
   return 'ignore';
 }
 
+const LOC_CODE_MAP = { MD:'MD', LET:'Letenská', OL:'Olomouc', PL:'Plzeň', BR:'Brno', CB:'České Budějovice', LTS:'Letiště' };
+
+function capitalizeFirst(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+// Vytěžení podkladu ve tvaru organigramu (units + people), jak ho produkuje appka na obsazování organigramu.
+// Osoby se src:'DESÚ' (současní zaměstnanci, neprocházejí onboardingem) se vynechávají.
+// Odbor/oddělení a pracoviště se berou z CÍLOVÉHO umístění (přes units[].positions[].person), ne z pole "unit" u osoby,
+// které popisuje jejich SOUČASNÉ zařazení na původním úřadě.
+async function readJsonOrgFile(file){
+  const text = await file.text();
+  const data = JSON.parse(text);
+  const units = Array.isArray(data.units) ? data.units : [];
+  const people = data.people && typeof data.people === 'object' ? data.people : {};
+  const unitsById = {};
+  units.forEach(u => { if(u && u.id) unitsById[u.id] = u; });
+  function resolveLoc(unitId){
+    let u = unitsById[unitId];
+    let guard = 0;
+    while(u && guard++ < 50){
+      if(u.loc) return LOC_CODE_MAP[u.loc] || u.loc;
+      u = u.parent ? unitsById[u.parent] : null;
+    }
+    return '';
+  }
+  const personToUnit = {};
+  units.forEach(u => {
+    (u.positions||[]).forEach(pos => {
+      if(pos && pos.person) personToUnit[pos.person] = { unit: u, pos };
+    });
+  });
+
+  const headers = ['Příjmení','Jméno','Titul','Původ','Odbor / oddělení','Pracoviště','Pozice','Úvazek'];
+  const rows = [];
+  Object.values(people).forEach(p => {
+    if(!p || p.src === 'DESÚ') return;
+    const raw = String(p.name||'').trim();
+    const parts = raw.split(',');
+    const namePart = (parts[0]||'').trim();
+    const titlePart = parts.slice(1).join(',').trim();
+    const tokens = namePart.split(/\s+/).filter(Boolean);
+    let jmeno = '', prijmeni = '';
+    if(tokens.length >= 2){ jmeno = tokens[tokens.length-1]; prijmeni = tokens.slice(0,-1).join(' '); }
+    else if(tokens.length === 1){ prijmeni = tokens[0]; }
+    const info = personToUnit[p.id];
+    const odbor = info ? info.unit.name : '';
+    const pracoviste = info ? resolveLoc(info.unit.id) : '';
+    const pozice = info ? capitalizeFirst(info.pos.label) : '';
+    rows.push([prijmeni, jmeno, titlePart, p.src||'', odbor, pracoviste, pozice, p.fte||'']);
+  });
+  const mapping = { 0:'prijmeni', 1:'jmeno', 2:'titul_pred', 3:'ignore', 4:'odbor_oddeleni', 5:'pracoviste', 6:'pozice', 7:'rozsah_uvazku' };
+  return { headers, rows, mapping, groupColIdx: 3 };
+}
+
 async function readXlsxFile(file){
   const buffer = await file.arrayBuffer();
   const wb = new ExcelJS.Workbook();
@@ -3615,6 +3711,13 @@ async function runImportBatch(){
     Object.entries(cur.common || {}).forEach(([key, val]) => {
       if(val) record.personal[key] = val;
     });
+    if(cur.groupColIdx != null){
+      const groupVal = row[cur.groupColIdx] || '(bez původu)';
+      const groupVals = (cur.groupCommon && cur.groupCommon[groupVal]) || {};
+      Object.entries(groupVals).forEach(([key, val]) => {
+        if(val) record.personal[key] = val;
+      });
+    }
     cur.headers.forEach((h, colIdx) => {
       const targetKey = cur.mapping[colIdx];
       if(!targetKey || targetKey === 'ignore') return;
